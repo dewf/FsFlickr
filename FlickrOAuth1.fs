@@ -86,9 +86,9 @@ let computeSignature (platform: IPlatformContext) (apiSecret: string) (verb: str
         |> String.concat "&"
     platform.HmacSha1 key text
 
-let private fetchFlickrOAuthKeyPairs (platform: IPlatformContext) (url: string) =
+let private fetchFlickrOAuthKeyPairs (platform: IPlatformContext) (url: string) (authHeader: string) =
     async {
-        let! code, resp = platform.HttpGet url
+        let! code, resp = platform.HttpGetWithAuthHeader url authHeader
         let result =
             match code with
             | 200 ->
@@ -103,18 +103,18 @@ let private fetchFlickrOAuthKeyPairs (platform: IPlatformContext) (url: string) 
         return result
     }
 
-let private fetchTokenAndSecret (platform: IPlatformContext) (url: string) =
+let private fetchTokenAndSecret (platform: IPlatformContext) (url: string) (authHeader: string) =
     async {
-        let! keyPairs = fetchFlickrOAuthKeyPairs platform url
+        let! keyPairs = fetchFlickrOAuthKeyPairs platform url authHeader
         return keyPairs
         |> Result.map (fun pairs ->
             { Token = pairs["oauth_token"]
               Secret = pairs["oauth_token_secret"] })
     }
 
-let private fetchFinalAccessToken (platform: IPlatformContext) (url: string) =
+let private fetchFinalAccessToken (platform: IPlatformContext) (url: string) (authHeader: string) =
     async {
-        let! keyPairs = fetchFlickrOAuthKeyPairs platform url
+        let! keyPairs = fetchFlickrOAuthKeyPairs platform url authHeader
         return keyPairs
         |> Result.map (fun pairs ->
             { Fullname = pairs["fullname"]
@@ -146,29 +146,10 @@ let generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret:
         return "OAuth " + joined
     }
 
-let mapToQueryString (platform: IPlatformContext) (map: Map<string, string>) =
-    // since browser has UrlSearchParams(), should this be provided by platform context instead?
-    map
-    |> Map.toList
-    |> List.map (fun (k, v) ->
-        let encodedKey = platform.EncodeURIComponent k
-        let encodedValue = platform.EncodeURIComponent v
-        sprintf "%s=%s" encodedKey encodedValue)
-    |> String.concat "&"
-
 let beginOAuthProcess (platform: IPlatformContext) (apiKey: string) (apiSecret: string) =
-    let fields =
-        generateAuthFields platform apiKey BeforeRequest
-        |> Map.ofList
     async {
-        let! signature = computeSignature platform apiSecret "GET" REQUEST_URL fields None
-        let queryString =
-            fields
-            |> Map.add "oauth_signature" signature
-            |> mapToQueryString platform
-        let url =
-            sprintf "%s?%s" REQUEST_URL queryString
-        return! fetchTokenAndSecret platform url
+        let! authHeader = generateAuthHeader platform apiKey apiSecret BeforeRequest [] "GET" REQUEST_URL
+        return! fetchTokenAndSecret platform REQUEST_URL authHeader
     }
 
 let generateAuthLink (platform: IPlatformContext) (ts: TokenAndSecret) =
@@ -176,20 +157,11 @@ let generateAuthLink (platform: IPlatformContext) (ts: TokenAndSecret) =
         [ "oauth_token", ts.Token
           "perms", "read" ]
         |> Map.ofList
-        |> mapToQueryString platform
+        |> Util.mapToQueryString platform
     sprintf "%s?%s" AUTH_URL queryString
 
 let finalizeOAuth (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (tokenAndSecret: TokenAndSecret) (verifier: string) =
-    let fields =
-        generateAuthFields platform apiKey (BeforeAccess (tokenAndSecret, verifier))
-        |> Map.ofList
     async {
-        let! signature = computeSignature platform apiSecret "GET" ACCESS_TOKEN_URL fields (Some tokenAndSecret.Secret)
-        let queryString =
-            fields
-            |> Map.add "oauth_signature" signature
-            |> mapToQueryString platform
-        let url =
-            sprintf "%s?%s" ACCESS_TOKEN_URL queryString
-        return! fetchFinalAccessToken platform url
+        let! authHeader = generateAuthHeader platform apiKey apiSecret (BeforeAccess (tokenAndSecret, verifier)) [] "GET" ACCESS_TOKEN_URL
+        return! fetchFinalAccessToken platform ACCESS_TOKEN_URL authHeader
     }

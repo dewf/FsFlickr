@@ -4,7 +4,6 @@ open System
 
 type IPlatformContext =
     // stuff that differs in the browser/desktop environments
-    abstract member HttpGet: url: string -> Async<int * string>
     abstract member HttpGetWithAuthHeader: url: string -> authHeader: string -> Async<int * string>
     abstract member HmacSha1: key: string -> message: string -> Async<string>
     abstract member RandomUUID: unit -> string
