@@ -10,12 +10,12 @@ type IPlatformContext =
     abstract member EncodeURIComponent: string -> string
     abstract member DecodeURIComponent: string -> string
 
-type ApiErrorType =
+type EndpointErrorType =
     | HttpError of code: int * message: string
     | DecodeError of message: string
     | Unauthorized
 with
-    static member messageMap (f: string -> string) (err: ApiErrorType) =
+    static member messageMap (f: string -> string) (err: EndpointErrorType) =
         match err with
         | HttpError (code, message) ->
             HttpError (code, f message)
@@ -34,7 +34,7 @@ with
 
 type FlickrApiError =
     | MethodError of code: int * message: string
-    | EndpointError of err: ApiErrorType // http, decoding, etc
+    | EndpointError of err: EndpointErrorType
 
 type FlickrApiResult<'a> =
     | FlickrOk of payload: 'a

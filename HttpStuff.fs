@@ -2,23 +2,14 @@ module FsFlickr.HttpStuff
 
 open Thoth.Json
 
-type ApiResult<'a> =
+type internal ApiResult<'a> =
     | ApiOk of 'a
-    | ApiError of ApiErrorType
-with
-    member this.IsOk =
-        match this with
-        | ApiOk _ -> true
-        | _ -> false
-    member this.Value =
-        match this with
-        | ApiOk x -> x
-        | _ -> failwith "ApiResult.Value failed: Not 'OK'"
+    | ApiError of EndpointErrorType
 
-let isSuccess (code: int) =
+let internal isSuccess (code: int) =
     code >= 200 && code < 300
 
-let decodeResponse (decoder: Decoder<'a>) (statusCode: int, responseText: string): ApiResult<'a> =
+let internal decodeResponse (decoder: Decoder<'a>) (statusCode: int, responseText: string): ApiResult<'a> =
     if isSuccess statusCode then
         match Decode.fromString decoder responseText with
         | Ok regResult ->
