@@ -4,7 +4,7 @@ open Thoth.Json
 
 type internal ApiResult<'a> =
     | ApiOk of 'a
-    | ApiError of EndpointErrorType
+    | ApiError of EndpointError
 
 let internal isSuccess (code: int) =
     code >= 200 && code < 300
@@ -17,8 +17,6 @@ let internal decodeResponse (decoder: Decoder<'a>) (statusCode: int, responseTex
         | Error err ->
             DecodeError $"json decode error: {err}"
             |> ApiError
-    elif statusCode = 401 then
-        ApiError Unauthorized
     else
         HttpError (statusCode, responseText)
         |> ApiError

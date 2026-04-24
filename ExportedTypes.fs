@@ -14,36 +14,18 @@ type OAuthCallback =
     | OutOfBand
     | CallbackURL of url: string
 
-type EndpointErrorType =
+type EndpointError =
     | HttpError of code: int * message: string
     | DecodeError of message: string
-    | Unauthorized
-with
-    static member messageMap (f: string -> string) (err: EndpointErrorType) =
-        match err with
-        | HttpError (code, message) ->
-            HttpError (code, f message)
-        | DecodeError message ->
-            DecodeError (f message)
-        | Unauthorized ->
-            Unauthorized
-    override this.ToString() =
-        match this with
-        | HttpError(code, message) ->
-            sprintf "HTTP error %d: %s" code message
-        | DecodeError message ->
-            sprintf "JSON decoding error: %s" message
-        | Unauthorized ->
-            "HTTP unauthorized"
 
-type FlickrApiError =
+type FlickrError =
     | MethodError of code: int * message: string
-    | EndpointError of err: EndpointErrorType
+    | EndpointError of err: EndpointError
 
 type FlickrApiResult<'a> =
     | FlickrOk of payload: 'a
-    | FlickrError of err: FlickrApiError
-    | FlickrNotYetAuthorized
+    | FlickrError of err: FlickrError
+    | FlickrNotYetAuthenticated
 with
     static member map (f: 'a -> 'b) (x: FlickrApiResult<'a>) =
         match x with
@@ -51,8 +33,8 @@ with
             FlickrOk (f payload)
         | FlickrError err ->
             FlickrError err
-        | FlickrNotYetAuthorized ->
-            FlickrNotYetAuthorized
+        | FlickrNotYetAuthenticated ->
+            FlickrNotYetAuthenticated
 
 type FlickrUserInfo = {
     Fullname: string

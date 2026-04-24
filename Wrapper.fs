@@ -18,7 +18,7 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
             f ati
         | _ ->
             async {
-                return FlickrNotYetAuthorized
+                return FlickrNotYetAuthenticated
             }
 
     member this.LoadAccessToken (json: string) =
