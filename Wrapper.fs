@@ -37,9 +37,9 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
         | _ ->
             None
 
-    member this.GenerateOAuthUrl () =
+    member this.GenerateOAuthUrl (callback: OAuthCallback) =
         async {
-            let! result = beginOAuthProcess platform apiKey apiSecret
+            let! result = beginOAuthProcess platform apiKey apiSecret callback
             match result with
             | Ok tokenAndSecret ->
                 let url = generateAuthLink platform tokenAndSecret

@@ -10,6 +10,10 @@ type IPlatformContext =
     abstract member EncodeURIComponent: string -> string
     abstract member DecodeURIComponent: string -> string
 
+type OAuthCallback =
+    | OutOfBand
+    | CallbackURL of url: string
+
 type EndpointErrorType =
     | HttpError of code: int * message: string
     | DecodeError of message: string

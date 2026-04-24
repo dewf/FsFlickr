@@ -39,7 +39,7 @@ let decodeAccessToken (input: string) =
     Decode.fromString decoder input
 
 type OAuthPhase =
-    | BeforeRequest
+    | BeforeRequest of callback: OAuthCallback
     | BeforeAuth of ts: TokenAndSecret
     | BeforeAccess of ts: TokenAndSecret * verifier: string
     | Authorized of ati: AccessTokenInfo
@@ -53,8 +53,12 @@ let generateAuthFields (platform: IPlatformContext) (apiKey: string) (phase: OAu
           "oauth_version", "1.0" ]
     let unique =
         match phase with
-        | BeforeRequest ->
-            [ "oauth_callback", "oob" ] // or URL, but we're using oob for desktop
+        | BeforeRequest callback ->
+            let callbackStr =
+                match callback with
+                | OutOfBand -> "oob"
+                | CallbackURL url -> url
+            [ "oauth_callback", callbackStr ]
         | BeforeAuth _ ->
             failwith "no auth fields for 'BeforeAuth' step (simple link generation only)"
         | BeforeAccess (ts, verifier) ->
@@ -132,7 +136,7 @@ let generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret:
         |> Map.ofList
     let tokenSecret =
         match phase with
-        | BeforeRequest -> None
+        | BeforeRequest _ -> None
         | BeforeAuth ts -> Some ts.Secret
         | BeforeAccess (ts, _) -> Some ts.Secret
         | Authorized ati -> Some ati.OAuthTokenSecret
@@ -146,9 +150,9 @@ let generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret:
         return "OAuth " + joined
     }
 
-let beginOAuthProcess (platform: IPlatformContext) (apiKey: string) (apiSecret: string) =
+let beginOAuthProcess (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (callback: OAuthCallback) =
     async {
-        let! authHeader = generateAuthHeader platform apiKey apiSecret BeforeRequest [] "GET" REQUEST_URL
+        let! authHeader = generateAuthHeader platform apiKey apiSecret (BeforeRequest callback) [] "GET" REQUEST_URL
         return! fetchTokenAndSecret platform REQUEST_URL authHeader
     }
 
