@@ -81,12 +81,10 @@ let private computeSignature (platform: IPlatformContext) (apiSecret: string) (v
         verb :: url :: joinedFields :: []
         |> List.map platform.EncodeURIComponent
         |> String.concat "&"
-        // TODO: we won't know for sure if we're doing the above encoding in the correct fashion
-        //   until we try using a real callback URL (vs "oob" for now)
     let key =
         [ apiSecret
           tokenSecret |> Option.defaultValue "" ]
-        // |> List.map JS.encodeURIComponent // necessary?
+        // |> List.map platform.EncodeURIComponent // technically necessary per OAuth 1.0a spec?
         |> String.concat "&"
     platform.HmacSha1 key text
 
