@@ -61,6 +61,10 @@ type GroupInfo = {
     Name: string
 }
 
+type InContext =
+    | NoContext
+    | InPool of name: string
+
 type Photo = {
     Id: string
     Owner: string
@@ -71,7 +75,16 @@ type Photo = {
     Server: int
     Farm: int
     SmallUrl: string
-}
+} with
+    member this.FlickrUrl (context: InContext) =
+        let pathSegment =
+            this.PathAlias
+            |> Option.defaultValue this.Owner
+        let inTail =
+            match context with
+            | NoContext -> ""
+            | InPool name -> $"in/pool-{name}/"
+        $"https://www.flickr.com/photos/{pathSegment}/{this.Id}/{inTail}"
 
 type Pagination = {
     CurrentPage: int    // 1-based
