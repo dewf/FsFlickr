@@ -2,16 +2,16 @@
 
 open Thoth.Json
 
-let REQUEST_URL = "https://www.flickr.com/services/oauth/request_token"
-let AUTH_URL = "https://www.flickr.com/services/oauth/authorize"
-let ACCESS_TOKEN_URL = "https://www.flickr.com/services/oauth/access_token"
+let private REQUEST_URL = "https://www.flickr.com/services/oauth/request_token"
+let private AUTH_URL = "https://www.flickr.com/services/oauth/authorize"
+let private ACCESS_TOKEN_URL = "https://www.flickr.com/services/oauth/access_token"
 
-type TokenAndSecret = {
+type internal TokenAndSecret = {
     Token: string
     Secret: string
 }
 
-type AccessTokenInfo = {
+type internal AccessTokenInfo = {
     Fullname: string
     OAuthToken: string
     OAuthTokenSecret: string
@@ -19,7 +19,7 @@ type AccessTokenInfo = {
     Username: string
 }
 
-let encodeAccessToken (ati: AccessTokenInfo) =
+let internal encodeAccessToken (ati: AccessTokenInfo) =
     Encode.object [
         "fullname", ati.Fullname
         "token", ati.OAuthToken
@@ -28,7 +28,7 @@ let encodeAccessToken (ati: AccessTokenInfo) =
         "username", ati.Username
     ] |> Encode.toString 4
 
-let decodeAccessToken (input: string) =
+let internal decodeAccessToken (input: string) =
     let decoder =
         Decode.object (fun get ->
             { Fullname = get.Required.Field "fullname" Decode.string
@@ -38,13 +38,13 @@ let decodeAccessToken (input: string) =
               Username = get.Required.Field "username" Decode.string })
     Decode.fromString decoder input
 
-type OAuthPhase =
+type internal OAuthPhase =
     | BeforeRequest of callback: OAuthCallback
     | BeforeAuth of ts: TokenAndSecret
     | BeforeAccess of ts: TokenAndSecret * verifier: string
     | Authorized of ati: AccessTokenInfo
 
-let generateAuthFields (platform: IPlatformContext) (apiKey: string) (phase: OAuthPhase) =
+let private generateAuthFields (platform: IPlatformContext) (apiKey: string) (phase: OAuthPhase) =
     let commonFields =
         [ "oauth_nonce", platform.RandomUUID()
           "oauth_timestamp", Util.unixTimestamp() |> string
@@ -68,7 +68,7 @@ let generateAuthFields (platform: IPlatformContext) (apiKey: string) (phase: OAu
             [ "oauth_token", ati.OAuthToken ]
     unique @ commonFields
 
-let computeSignature (platform: IPlatformContext) (apiSecret: string) (verb: string) (url: string) (fields: Map<string, string>) (tokenSecret: string option) =
+let private computeSignature (platform: IPlatformContext) (apiSecret: string) (verb: string) (url: string) (fields: Map<string, string>) (tokenSecret: string option) =
     let text =
         let joinedFields =
             fields.Keys
@@ -128,7 +128,7 @@ let private fetchFinalAccessToken (platform: IPlatformContext) (url: string) (au
               Username = pairs["username"] })
     }
 
-let generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (phase: OAuthPhase) (dataFields: (string * string) list) (verb: string) (url: string) =
+let internal generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (phase: OAuthPhase) (dataFields: (string * string) list) (verb: string) (url: string) =
     let authFields =
         generateAuthFields platform apiKey phase
     let signatureFields =
@@ -150,13 +150,13 @@ let generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret:
         return "OAuth " + joined
     }
 
-let beginOAuthProcess (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (callback: OAuthCallback) =
+let internal beginOAuthProcess (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (callback: OAuthCallback) =
     async {
         let! authHeader = generateAuthHeader platform apiKey apiSecret (BeforeRequest callback) [] "GET" REQUEST_URL
         return! fetchTokenAndSecret platform REQUEST_URL authHeader
     }
 
-let generateAuthLink (platform: IPlatformContext) (ts: TokenAndSecret) =
+let internal generateAuthLink (platform: IPlatformContext) (ts: TokenAndSecret) =
     let queryString =
         [ "oauth_token", ts.Token
           "perms", "read" ]
@@ -164,7 +164,7 @@ let generateAuthLink (platform: IPlatformContext) (ts: TokenAndSecret) =
         |> Util.mapToQueryString platform
     sprintf "%s?%s" AUTH_URL queryString
 
-let finalizeOAuth (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (tokenAndSecret: TokenAndSecret) (verifier: string) =
+let internal finalizeOAuth (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (tokenAndSecret: TokenAndSecret) (verifier: string) =
     async {
         let! authHeader = generateAuthHeader platform apiKey apiSecret (BeforeAccess (tokenAndSecret, verifier)) [] "GET" ACCESS_TOKEN_URL
         return! fetchFinalAccessToken platform ACCESS_TOKEN_URL authHeader

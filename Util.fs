@@ -2,13 +2,13 @@
 
 open System
 
-let unixTimestamp () =
+let internal unixTimestamp () =
     DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 
-let timestampToDateTime (ts: string) =
+let internal timestampToDateTime (ts: string) =
     DateTimeOffset.FromUnixTimeSeconds(ts |> int64).LocalDateTime
 
-let mapToQueryString (platform: IPlatformContext) (map: Map<string, string>) =
+let internal mapToQueryString (platform: IPlatformContext) (map: Map<string, string>) =
     // since browser has UrlSearchParams(), should this be provided by platform context instead?
     map
     |> Map.toList

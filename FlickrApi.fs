@@ -5,7 +5,7 @@ open FsFlickr.Util
 open HttpStuff
 open Thoth.Json
 
-let FLICKR_REST_URL = "https://www.flickr.com/services/rest"
+let private FLICKR_REST_URL = "https://www.flickr.com/services/rest"
 
 let private flickrRestResultDecoder (subgetter: Decode.IGetters -> 'a): Decoder<FlickrApiResult<'a>> =
     Decode.object (fun get ->
@@ -22,7 +22,7 @@ let private flickrRestResultDecoder (subgetter: Decode.IGetters -> 'a): Decoder<
         | _ ->
             failwith "jsonResultDecoder: unknown flickr json status")
 
-let internal flickrMethod (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo) (method: string) (methodArgs: (string * string) list) (subgetter: Decode.IGetters -> 'a) =
+let private flickrMethod (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo) (method: string) (methodArgs: (string * string) list) (subgetter: Decode.IGetters -> 'a) =
     let data =
         [ "nojsoncallback", "1"
           "format", "json"
@@ -96,3 +96,5 @@ let internal getGroupPhotos (platform: IPlatformContext) (apiKey: string) (apiSe
           "per_page", string perPage
           "extras", "o_dims, url_q, path_alias" ]
     flickrMethod platform apiKey apiSecret accessToken "flickr.groups.pools.getPhotos" args photosPageGetter
+
+// next: user favorites
