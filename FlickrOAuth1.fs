@@ -5,7 +5,6 @@ open Thoth.Json
 let REQUEST_URL = "https://www.flickr.com/services/oauth/request_token"
 let AUTH_URL = "https://www.flickr.com/services/oauth/authorize"
 let ACCESS_TOKEN_URL = "https://www.flickr.com/services/oauth/access_token"
-let FLICKR_REST_URL = "https://www.flickr.com/services/rest"
 
 type TokenAndSecret = {
     Token: string

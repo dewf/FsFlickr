@@ -5,6 +5,8 @@ open FsFlickr.Util
 open HttpStuff
 open Thoth.Json
 
+let FLICKR_REST_URL = "https://www.flickr.com/services/rest"
+
 let private flickrRestResultDecoder (subgetter: Decode.IGetters -> 'a): Decoder<FlickrApiResult<'a>> =
     Decode.object (fun get ->
         match get.Required.Field "stat" Decode.string with
