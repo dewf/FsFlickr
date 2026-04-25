@@ -74,10 +74,16 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
         }
 
     member this.GetGroupId (name: string) =
-        withAccessToken (fun ati -> getGroupId platform apiKey apiSecret ati name)
+        withAccessToken (fun ati -> urlsLookupGroup platform apiKey apiSecret ati name)
 
     member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int) =
         withAccessToken (fun ati -> getGroupPhotos platform apiKey apiSecret ati id perPage page)
 
     member this.GetFavorites (?userId: NSID, ?minFaveDate: DateTime, ?maxFaveDate: DateTime, ?perPage: int, ?page: int) =
         withAccessToken (fun ati -> getFavorites platform apiKey apiSecret ati userId minFaveDate maxFaveDate perPage page)
+
+    member this.GetPhotoSet (userId: NSID, photosetId: string, ?perPage: int, ?page: int) =
+        withAccessToken (fun ati -> getPhotoset platform apiKey apiSecret ati userId photosetId perPage page)
+
+    member this.UrlsLookupUser (url: string) =
+        withAccessToken (fun ati -> urlsLookupUser platform apiKey apiSecret ati url)

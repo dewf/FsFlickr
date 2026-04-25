@@ -67,7 +67,8 @@ type PhotoCommon = {
     Secret: string
     Server: int
     Farm: int
-    SmallUrl: string
+    Square150: string
+    Medium240: string option
 } with
     member this.FlickrUrl (context: InContext) =
         let pathSegment =
@@ -96,6 +97,11 @@ type FavoritesPhoto = {
     Common: PhotoCommon
     DateFaved: DateTime
     UpgradeSizes: string list option
+}
+
+type PhotosetPhoto = {
+    Common: PhotoCommon
+    // no extra fields yet
 }
 
 type PhotosPage<'t> = {
