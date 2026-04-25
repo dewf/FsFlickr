@@ -21,11 +21,11 @@ type internal AccessTokenInfo = {
 
 let internal encodeAccessToken (ati: AccessTokenInfo) =
     Encode.object [
-        "fullname", ati.Fullname
-        "token", ati.OAuthToken
-        "secret", ati.OAuthTokenSecret
-        "nsid", ati.UserNSID
-        "username", ati.Username
+        "fullname", Encode.string ati.Fullname
+        "token", Encode.string ati.OAuthToken
+        "secret", Encode.string ati.OAuthTokenSecret
+        "nsid", Encode.string (string ati.UserNSID)
+        "username", Encode.string ati.Username
     ] |> Encode.toString 4
 
 let internal decodeAccessToken (input: string) =
