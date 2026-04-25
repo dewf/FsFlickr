@@ -1,5 +1,6 @@
 ﻿namespace FsFlickr
 
+open System
 open FlickrOAuth1
 open FlickrApi
 
@@ -75,5 +76,8 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
     member this.GetGroupId (name: string) =
         withAccessToken (fun ati -> getGroupId platform apiKey apiSecret ati name)
 
-    member this.GetGroupPhotos (id: string) (perPage: int) (page: int) =
+    member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int) =
         withAccessToken (fun ati -> getGroupPhotos platform apiKey apiSecret ati id perPage page)
+
+    member this.GetFavorites (?userId: NSID, ?minFaveDate: DateTime, ?maxFaveDate: DateTime, ?perPage: int, ?page: int) =
+        withAccessToken (fun ati -> getFavorites platform apiKey apiSecret ati userId minFaveDate maxFaveDate perPage page)

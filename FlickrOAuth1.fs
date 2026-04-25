@@ -15,7 +15,7 @@ type internal AccessTokenInfo = {
     Fullname: string
     OAuthToken: string
     OAuthTokenSecret: string
-    UserNSID: string
+    UserNSID: NSID
     Username: string
 }
 
@@ -34,7 +34,7 @@ let internal decodeAccessToken (input: string) =
             { Fullname = get.Required.Field "fullname" Decode.string
               OAuthToken = get.Required.Field "token" Decode.string
               OAuthTokenSecret = get.Required.Field "secret" Decode.string
-              UserNSID = get.Required.Field "nsid" Decode.string
+              UserNSID = get.Required.Field "nsid" (Decode.map NSID Decode.string)
               Username = get.Required.Field "username" Decode.string })
     Decode.fromString decoder input
 
@@ -122,7 +122,7 @@ let private fetchFinalAccessToken (platform: IPlatformContext) (url: string) (au
             { Fullname = pairs["fullname"]
               OAuthToken = pairs["oauth_token"]
               OAuthTokenSecret = pairs["oauth_token_secret"]
-              UserNSID = pairs["user_nsid"]
+              UserNSID = NSID pairs["user_nsid"]
               Username = pairs["username"] })
     }
 

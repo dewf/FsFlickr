@@ -1,5 +1,6 @@
 ﻿module FsFlickr.FlickrApi
 
+open System
 open FlickrOAuth1
 open FsFlickr.Util
 open HttpStuff
@@ -54,7 +55,7 @@ let private flickrMethod (platform: IPlatformContext) (apiKey: string) (apiSecre
 
 let private groupIdGetter (get: Decode.IGetters) =
     get.Required.Field "group" (Decode.object (fun get -> {
-        Id = get.Required.Field "id" Decode.string
+        Id = get.Required.Field "id" (Decode.map NSID Decode.string)
         Name = get.Required.Field "groupname" (Decode.object (fun get -> get.Required.Field "_content" Decode.string))
     }))
 
@@ -65,17 +66,18 @@ let internal getGroupId (platform: IPlatformContext) (apiKey: string) (apiSecret
         [ ("url", url) ]
     flickrMethod platform apiKey apiSecret accessToken "flickr.urls.lookupGroup" args groupIdGetter
 
-let private photoDecoder: Decoder<Photo> =
-    Decode.object (fun get ->
+let private photoCommonDecoder (get: Decode.IGetters) =
         { Id = get.Required.Field "id" Decode.string
-          Owner = get.Required.Field "owner" Decode.string
+          Owner = get.Required.Field "owner" (Decode.map NSID Decode.string)
           PathAlias = get.Optional.Field "pathalias" Decode.string
           Title = get.Required.Field "title" Decode.string
-          DateAdded = get.Required.Field "dateadded" (Decode.map timestampToDateTime Decode.string)
           Secret = get.Required.Field "secret" Decode.string
           Server = get.Required.Field "server" Decode.int
           Farm = get.Required.Field "farm" Decode.int
-          SmallUrl = get.Required.Field "url_q" Decode.string }) // see: https://www.flickr.com/services/api/misc.urls.html
+          SmallUrl = get.Required.Field "url_q" Decode.string } // see: https://www.flickr.com/services/api/misc.urls.html
+
+let private timestampToDateTimeDecoder =
+    Decode.map (int64 >> timestampToDateTime) Decode.string
 
 let private paginationGetter (get: Decode.IGetters) =
     { CurrentPage = get.Required.Field "page" Decode.int
@@ -83,18 +85,49 @@ let private paginationGetter (get: Decode.IGetters) =
       ItemsPerPage = get.Required.Field "perpage" Decode.int
       TotalItems = get.Required.Field "total" Decode.int }
 
-let private photosPageGetter (get: Decode.IGetters) =
+// group pool =================================
+let private groupPhotoDecoder: Decoder<GroupPoolPhoto> =
+    Decode.object (fun get ->
+        { Common = photoCommonDecoder get
+          DateAdded = get.Required.Field "dateadded" timestampToDateTimeDecoder })
+
+let private groupPhotosPageGetter (get: Decode.IGetters) =
     get.Required.Field "photos" (Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list photoDecoder) }
+          Photos = get.Required.Field "photo" (Decode.list groupPhotoDecoder) }
         ))
-    
-let internal getGroupPhotos (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo) (id: string) (perPage: int) (page: int) =
-    let args =
-        [ "group_id", id
-          "page", string page
-          "per_page", string perPage
-          "extras", "o_dims, url_q, path_alias" ]
-    flickrMethod platform apiKey apiSecret accessToken "flickr.groups.pools.getPhotos" args photosPageGetter
 
-// next: user favorites
+let internal getGroupPhotos (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (id: NSID) (perPage: int option) (page: int option) =
+        let args =
+            [ "group_id", string id
+              if page.IsSome then "page", string page.Value
+              if perPage.IsSome then "per_page", string perPage.Value
+              "extras", "o_dims, url_q, path_alias" ]
+        flickrMethod platform apiKey apiSecret accessToken "flickr.groups.pools.getPhotos" args groupPhotosPageGetter
+
+// favorites ==================================
+let private favesPhotoDecoder: Decoder<FavoritesPhoto> =
+    Decode.object (fun get ->
+        { Common = photoCommonDecoder get
+          DateFaved = get.Required.Field "date_faved" timestampToDateTimeDecoder
+          UpgradeSizes = get.Optional.Field "upgrade_sizes" (Decode.list Decode.string) })
+
+let private favoritesPageGetter (get: Decode.IGetters) =
+    get.Required.Field "photos" (Decode.object (fun get->
+        { Pagination = paginationGetter get
+          Photos = get.Required.Field "photo" (Decode.list favesPhotoDecoder) }
+        ))
+
+let internal getFavorites
+    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (userId: NSID option) (minDate: DateTime option) (maxDate: DateTime option)
+    (perPage: int option) (page: int option) =
+        let args =
+            [ if userId.IsSome then "user_id", string userId.Value
+              if minDate.IsSome then "min_fave_date", dateTimeToTimestamp minDate.Value |> string
+              if maxDate.IsSome then "max_fave_date", dateTimeToTimestamp maxDate.Value |> string
+              if perPage.IsSome then "per_page", string perPage.Value
+              if page.IsSome then "page", string page.Value
+              "extras", "o_dims, url_q, path_alias" ]
+        flickrMethod platform apiKey apiSecret accessToken "flickr.favorites.getList" args favoritesPageGetter

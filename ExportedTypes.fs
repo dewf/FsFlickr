@@ -36,27 +36,34 @@ with
         | FlickrNotYetAuthenticated ->
             FlickrNotYetAuthenticated
 
+type NSID =
+    NSID of nsid: string
+with
+    override this.ToString() =
+        match this with
+        | NSID nsid -> nsid
+
 type FlickrUserInfo = {
     Fullname: string
-    UserNSID: string
+    UserNSID: NSID
     Username: string
 }
 
 type GroupInfo = {
-    Id: string
+    Id: NSID
     Name: string
 }
 
 type InContext =
     | NoContext
     | InPool of name: string
+    | InFavorites of nsid: NSID
 
-type Photo = {
+type PhotoCommon = {
     Id: string
-    Owner: string
+    Owner: NSID
     PathAlias: string option
     Title: string
-    DateAdded: DateTime
     Secret: string
     Server: int
     Farm: int
@@ -65,11 +72,12 @@ type Photo = {
     member this.FlickrUrl (context: InContext) =
         let pathSegment =
             this.PathAlias
-            |> Option.defaultValue this.Owner
+            |> Option.defaultValue (string this.Owner)
         let inTail =
             match context with
             | NoContext -> ""
             | InPool name -> $"in/pool-{name}/"
+            | InFavorites name -> $"in/faves-{name}/"
         $"https://www.flickr.com/photos/{pathSegment}/{this.Id}/{inTail}"
 
 type Pagination = {
@@ -79,7 +87,18 @@ type Pagination = {
     TotalItems: int
 }
 
-type PhotosPage = {
+type GroupPoolPhoto = {
+    Common: PhotoCommon
+    DateAdded: DateTime
+}
+
+type FavoritesPhoto = {
+    Common: PhotoCommon
+    DateFaved: DateTime
+    UpgradeSizes: string list option
+}
+
+type PhotosPage<'t> = {
     Pagination: Pagination
-    Photos: Photo list
+    Photos: 't list
 }
