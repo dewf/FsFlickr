@@ -2,14 +2,6 @@
 
 open System
 
-type IPlatformContext =
-    // stuff that differs in the browser/desktop environments
-    abstract member HttpGetWithAuthHeader: url: string -> authHeader: string -> Async<int * string>
-    abstract member HmacSha1: key: string -> message: string -> Async<string>
-    abstract member RandomUUID: unit -> string
-    abstract member EncodeURIComponent: string -> string
-    abstract member DecodeURIComponent: string -> string
-
 type OAuthCallback =
     | OutOfBand
     | CallbackURL of url: string

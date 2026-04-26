@@ -1,6 +1,6 @@
 module FsFlickr.HttpStuff
 
-#if FABLE_COMPILER
+#if PLATFORM_FABLE
 open Thoth.Json
 #else
 open Thoth.Json.Net

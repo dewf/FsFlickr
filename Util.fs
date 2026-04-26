@@ -11,12 +11,12 @@ let internal timestampToDateTime (ts: int64) =
 let internal dateTimeToTimestamp (dt: DateTime) =
     DateTimeOffset(dt).ToUnixTimeSeconds()
 
-let internal mapToQueryString (platform: IPlatformContext) (map: Map<string, string>) =
+let internal mapToQueryString (map: Map<string, string>) =
     // since browser has UrlSearchParams(), should this be provided by platform context instead?
     map
     |> Map.toList
     |> List.map (fun (k, v) ->
-        let encodedKey = platform.EncodeURIComponent k
-        let encodedValue = platform.EncodeURIComponent v
+        let encodedKey = Platform.encodeURIComponent k
+        let encodedValue = Platform.encodeURIComponent v
         sprintf "%s=%s" encodedKey encodedValue)
     |> String.concat "&"

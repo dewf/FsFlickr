@@ -4,8 +4,9 @@ open System
 open FlickrOAuth1
 open FsFlickr.Util
 open HttpStuff
+open Config
 
-#if FABLE_COMPILER
+#if PLATFORM_FABLE
 open Thoth.Json
 #else
 open Thoth.Json.Net
@@ -28,7 +29,7 @@ let private flickrRestResultDecoder (subgetter: Decode.IGetters -> 'a): Decoder<
         | _ ->
             failwith "jsonResultDecoder: unknown flickr json status")
 
-let private flickrMethod (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo) (method: string) (methodArgs: (string * string) list) (subgetter: Decode.IGetters -> 'a) =
+let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (method: string) (methodArgs: (string * string) list) (subgetter: Decode.IGetters -> 'a) =
     let data =
         [ "nojsoncallback", "1"
           "format", "json"
@@ -36,15 +37,15 @@ let private flickrMethod (platform: IPlatformContext) (apiKey: string) (apiSecre
         @ methodArgs
     async {
         let! authHeader =
-            generateAuthHeader platform apiKey apiSecret (Authorized accessToken) data "GET" FLICKR_REST_URL
+            generateAuthHeader config (Authorized accessToken) data "GET" FLICKR_REST_URL
         let queryString =
             data
             |> Map.ofList
-            |> mapToQueryString platform
+            |> mapToQueryString
         let url =
             sprintf "%s?%s" FLICKR_REST_URL queryString
         let! response =
-            platform.HttpGetWithAuthHeader url authHeader
+            Platform.httpGetWithAuthHeader config url authHeader
         // printfn "raw response: [%A]" response
         let result =
             let decoder =
@@ -102,12 +103,12 @@ let private urlsLookupGroupGetter (get: Decode.IGetters) =
         Name = get.Required.Field "groupname" (Decode.object (fun get -> get.Required.Field "_content" Decode.string))
     }))
 
-let internal urlsLookupGroup (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo) (name: string) =
+let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInfo) (name: string) =
     let url =
         $"https://www.flickr.com/groups/{name}"
     let args =
         [ ("url", url) ]
-    flickrMethod platform apiKey apiSecret accessToken "flickr.urls.lookupGroup" args urlsLookupGroupGetter
+    flickrMethod config accessToken "flickr.urls.lookupGroup" args urlsLookupGroupGetter
 
 // group pool =================================
 let private groupPhotoDecoder: Decoder<GroupPoolPhoto> =
@@ -121,14 +122,14 @@ let private groupPhotosPageGetter (get: Decode.IGetters) =
           Photos = get.Required.Field "photo" (Decode.list groupPhotoDecoder) }
         ))
 
-let internal getGroupPhotos (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (id: NSID) (perPage: int option) (page: int option) =
         let args =
             [ "group_id", string id
               if page.IsSome then "page", string page.Value
               if perPage.IsSome then "per_page", string perPage.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod platform apiKey apiSecret accessToken "flickr.groups.pools.getPhotos" args groupPhotosPageGetter
+        flickrMethod config accessToken "flickr.groups.pools.getPhotos" args groupPhotosPageGetter
 
 // favorites ==================================
 let private favesPhotoDecoder: Decoder<FavoritesPhoto> =
@@ -144,7 +145,7 @@ let private favoritesPageGetter (get: Decode.IGetters) =
         ))
 
 let internal getFavorites
-    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (userId: NSID option) (minDate: DateTime option) (maxDate: DateTime option)
     (perPage: int option) (page: int option) =
         let args =
@@ -154,7 +155,7 @@ let internal getFavorites
               if perPage.IsSome then "per_page", string perPage.Value
               if page.IsSome then "page", string page.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod platform apiKey apiSecret accessToken "flickr.favorites.getList" args favoritesPageGetter
+        flickrMethod config accessToken "flickr.favorites.getList" args favoritesPageGetter
 
 // photo set =====================================
 
@@ -169,7 +170,7 @@ let private photosetPageGetter (owner: NSID) (get: Decode.IGetters) =
         ))
 
 let internal getPhotoset
-    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (userId: NSID) (photosetId: string)
     (perPage: int option) (page: int option) =
         let args =
@@ -178,7 +179,7 @@ let internal getPhotoset
               if perPage.IsSome then "per_page", string perPage.Value
               if page.IsSome then "page", string page.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod platform apiKey apiSecret accessToken "flickr.photosets.getPhotos" args (photosetPageGetter userId)
+        flickrMethod config accessToken "flickr.photosets.getPhotos" args (photosetPageGetter userId)
 
 // look up user by URL =======================================
 
@@ -188,11 +189,11 @@ let private urlsLookupUserGetter (get: Decode.IGetters) =
         ))
 
 let internal urlsLookupUser
-    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (url: string) =
         let args =
             [ "url", url ]
-        flickrMethod platform apiKey apiSecret accessToken "flickr.urls.lookupUser" args urlsLookupUserGetter
+        flickrMethod config accessToken "flickr.urls.lookupUser" args urlsLookupUserGetter
 
 // photo info ================================================
 
@@ -270,12 +271,12 @@ let private getPhotoInfoGetter (get: Decode.IGetters) =
     }))
 
 let internal getPhotoInfo
-    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (photoId: string) (photoSecret: string option) =
         let args =
             [ "photo_id", photoId
               if photoSecret.IsSome then "secret", photoSecret.Value ]
-        flickrMethod platform apiKey apiSecret accessToken "flickr.photos.getInfo" args getPhotoInfoGetter
+        flickrMethod config accessToken "flickr.photos.getInfo" args getPhotoInfoGetter
 
 let private decodeMedia: Decoder<Media> =
     let f = function
@@ -299,8 +300,8 @@ let private getSizesGetter (get: Decode.IGetters) =
         get.Required.Field "size" (Decode.list sizeDecoder)))
 
 let internal getSizes
-    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (photoId: string) =
         let args =
             [ "photo_id", photoId ]
-        flickrMethod platform apiKey apiSecret accessToken "flickr.photos.getSizes" args getSizesGetter
+        flickrMethod config accessToken "flickr.photos.getSizes" args getSizesGetter

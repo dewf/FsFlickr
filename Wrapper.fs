@@ -3,6 +3,7 @@
 open System
 open FlickrOAuth1
 open FlickrApi
+open Config
 
 type private AuthState =
     | Init
@@ -10,8 +11,12 @@ type private AuthState =
     | Finalized of ati: AccessTokenInfo
     | ErrState of reason: string
 
-type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
+type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
     let mutable authState: AuthState = Init
+    let config =
+        { ApiKey = apiKey
+          ApiSecret = apiSecret
+          CorsProxy = corsProxy }
 
     let withAccessToken (f: AccessTokenInfo -> Async<FlickrApiResult<'a>>) =
         match authState with
@@ -40,10 +45,10 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
 
     member this.GenerateOAuthUrl (callback: OAuthCallback) =
         async {
-            let! result = beginOAuthProcess platform apiKey apiSecret callback
+            let! result = beginOAuthProcess config callback
             match result with
             | Ok tokenAndSecret ->
-                let url = generateAuthLink platform tokenAndSecret
+                let url = generateAuthLink tokenAndSecret
                 authState <- PreVerify tokenAndSecret
                 return Ok url
             | Error err ->
@@ -58,7 +63,7 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
             | Init ->
                 return (Error "FlickrAPI.Verify(): tried to verify from the init state - call .GenerateOAuthUrl() first, and visit the link")
             | PreVerify ts ->
-                let! result = finalizeOAuth platform apiKey apiSecret ts verifier
+                let! result = finalizeOAuth config ts verifier
                 match result with
                 | Ok ati ->
                     authState <- Finalized ati
@@ -74,22 +79,22 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
         }
 
     member this.GetGroupId (name: string) =
-        withAccessToken (fun ati -> urlsLookupGroup platform apiKey apiSecret ati name)
+        withAccessToken (fun ati -> urlsLookupGroup config ati name)
 
     member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int) =
-        withAccessToken (fun ati -> getGroupPhotos platform apiKey apiSecret ati id perPage page)
+        withAccessToken (fun ati -> getGroupPhotos config ati id perPage page)
 
     member this.GetFavorites (?userId: NSID, ?minFaveDate: DateTime, ?maxFaveDate: DateTime, ?perPage: int, ?page: int) =
-        withAccessToken (fun ati -> getFavorites platform apiKey apiSecret ati userId minFaveDate maxFaveDate perPage page)
+        withAccessToken (fun ati -> getFavorites config ati userId minFaveDate maxFaveDate perPage page)
 
     member this.GetPhotoSet (userId: NSID, photosetId: string, ?perPage: int, ?page: int) =
-        withAccessToken (fun ati -> getPhotoset platform apiKey apiSecret ati userId photosetId perPage page)
+        withAccessToken (fun ati -> getPhotoset config ati userId photosetId perPage page)
 
     member this.UrlsLookupUser (url: string) =
-        withAccessToken (fun ati -> urlsLookupUser platform apiKey apiSecret ati url)
+        withAccessToken (fun ati -> urlsLookupUser config ati url)
 
     member this.GetPhotoInfo (id: string, ?secret: string) =
-        withAccessToken (fun ati -> getPhotoInfo platform apiKey apiSecret ati id secret)
+        withAccessToken (fun ati -> getPhotoInfo config ati id secret)
 
     member this.GetPhotoSizes (id: string) =
-        withAccessToken (fun ati -> getSizes platform apiKey apiSecret ati id)
+        withAccessToken (fun ati -> getSizes config ati id)

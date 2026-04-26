@@ -1,10 +1,12 @@
 ﻿module FsFlickr.FlickrOAuth1
 
-#if FABLE_COMPILER
+#if PLATFORM_FABLE
 open Thoth.Json
 #else
 open Thoth.Json.Net
 #endif
+
+open Config
 
 let private REQUEST_URL = "https://www.flickr.com/services/oauth/request_token"
 let private AUTH_URL = "https://www.flickr.com/services/oauth/authorize"
@@ -48,9 +50,9 @@ type internal OAuthPhase =
     | BeforeAccess of ts: TokenAndSecret * verifier: string
     | Authorized of ati: AccessTokenInfo
 
-let private generateAuthFields (platform: IPlatformContext) (apiKey: string) (phase: OAuthPhase) =
+let private generateAuthFields (apiKey: string) (phase: OAuthPhase) =
     let commonFields =
-        [ "oauth_nonce", platform.RandomUUID()
+        [ "oauth_nonce", Platform.randomUUID()
           "oauth_timestamp", Util.unixTimestamp() |> string
           "oauth_consumer_key", apiKey
           "oauth_signature_method", "HMAC-SHA1"
@@ -72,36 +74,36 @@ let private generateAuthFields (platform: IPlatformContext) (apiKey: string) (ph
             [ "oauth_token", ati.OAuthToken ]
     unique @ commonFields
 
-let private computeSignature (platform: IPlatformContext) (apiSecret: string) (verb: string) (url: string) (fields: Map<string, string>) (tokenSecret: string option) =
+let private computeSignature (apiSecret: string) (verb: string) (url: string) (fields: Map<string, string>) (tokenSecret: string option) =
     let text =
         let joinedFields =
             fields.Keys
             |> Seq.sort
             |> Seq.map (fun k ->
-                let encodedKey = platform.EncodeURIComponent k
-                let encodedValue = platform.EncodeURIComponent fields[k]
+                let encodedKey = Platform.encodeURIComponent k
+                let encodedValue = Platform.encodeURIComponent fields[k]
                 encodedKey + "=" + encodedValue)
             |> String.concat "&"
         verb :: url :: joinedFields :: []
-        |> List.map platform.EncodeURIComponent
+        |> List.map Platform.encodeURIComponent
         |> String.concat "&"
     let key =
         [ apiSecret
           tokenSecret |> Option.defaultValue "" ]
-        // |> List.map platform.EncodeURIComponent // technically necessary per OAuth 1.0a spec?
+        // |> List.map encodeURIComponent // technically necessary per OAuth 1.0a spec?
         |> String.concat "&"
-    platform.HmacSha1 key text
+    Platform.hmacSha1 key text
 
-let private fetchFlickrOAuthKeyPairs (platform: IPlatformContext) (url: string) (authHeader: string) =
+let private fetchFlickrOAuthKeyPairs (config: FlickrConfig) (url: string) (authHeader: string) =
     async {
-        let! code, resp = platform.HttpGetWithAuthHeader url authHeader
+        let! code, resp = Platform.httpGetWithAuthHeader config url authHeader
         let result =
             match code with
             | 200 ->
                 resp.Split("&")
                 |> Array.map (fun pair ->
                     let both = pair.Split("=")
-                    platform.DecodeURIComponent both[0], platform.DecodeURIComponent both[1])
+                    Platform.decodeURIComponent both[0], Platform.decodeURIComponent both[1])
                 |> Map.ofArray
                 |> Ok
             | _ ->
@@ -109,18 +111,18 @@ let private fetchFlickrOAuthKeyPairs (platform: IPlatformContext) (url: string) 
         return result
     }
 
-let private fetchTokenAndSecret (platform: IPlatformContext) (url: string) (authHeader: string) =
+let private fetchTokenAndSecret (config: FlickrConfig) (url: string) (authHeader: string) =
     async {
-        let! keyPairs = fetchFlickrOAuthKeyPairs platform url authHeader
+        let! keyPairs = fetchFlickrOAuthKeyPairs config url authHeader
         return keyPairs
         |> Result.map (fun pairs ->
             { Token = pairs["oauth_token"]
               Secret = pairs["oauth_token_secret"] })
     }
 
-let private fetchFinalAccessToken (platform: IPlatformContext) (url: string) (authHeader: string) =
+let private fetchFinalAccessToken (config: FlickrConfig) (url: string) (authHeader: string) =
     async {
-        let! keyPairs = fetchFlickrOAuthKeyPairs platform url authHeader
+        let! keyPairs = fetchFlickrOAuthKeyPairs config url authHeader
         return keyPairs
         |> Result.map (fun pairs ->
             { Fullname = pairs["fullname"]
@@ -130,9 +132,9 @@ let private fetchFinalAccessToken (platform: IPlatformContext) (url: string) (au
               Username = pairs["username"] })
     }
 
-let internal generateAuthHeader (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (phase: OAuthPhase) (dataFields: (string * string) list) (verb: string) (url: string) =
+let internal generateAuthHeader (config: FlickrConfig) (phase: OAuthPhase) (dataFields: (string * string) list) (verb: string) (url: string) =
     let authFields =
-        generateAuthFields platform apiKey phase
+        generateAuthFields config.ApiKey phase
     let signatureFields =
         dataFields @ authFields
         |> Map.ofList
@@ -143,31 +145,31 @@ let internal generateAuthHeader (platform: IPlatformContext) (apiKey: string) (a
         | BeforeAccess (ts, _) -> Some ts.Secret
         | Authorized ati -> Some ati.OAuthTokenSecret
     async {
-        let! signature = computeSignature platform apiSecret verb url signatureFields tokenSecret
+        let! signature = computeSignature config.ApiSecret verb url signatureFields tokenSecret
         let joined =
             ("oauth_signature", signature) :: authFields
             |> List.map (fun (key, value) ->
-                sprintf "%s=\"%s\"" (platform.EncodeURIComponent key) (platform.EncodeURIComponent value))
+                sprintf "%s=\"%s\"" (Platform.encodeURIComponent key) (Platform.encodeURIComponent value))
             |> String.concat ", "
         return "OAuth " + joined
     }
 
-let internal beginOAuthProcess (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (callback: OAuthCallback) =
+let internal beginOAuthProcess (config: FlickrConfig) (callback: OAuthCallback) =
     async {
-        let! authHeader = generateAuthHeader platform apiKey apiSecret (BeforeRequest callback) [] "GET" REQUEST_URL
-        return! fetchTokenAndSecret platform REQUEST_URL authHeader
+        let! authHeader = generateAuthHeader config (BeforeRequest callback) [] "GET" REQUEST_URL
+        return! fetchTokenAndSecret config REQUEST_URL authHeader
     }
 
-let internal generateAuthLink (platform: IPlatformContext) (ts: TokenAndSecret) =
+let internal generateAuthLink (ts: TokenAndSecret) =
     let queryString =
         [ "oauth_token", ts.Token
           "perms", "read" ]
         |> Map.ofList
-        |> Util.mapToQueryString platform
+        |> Util.mapToQueryString
     sprintf "%s?%s" AUTH_URL queryString
 
-let internal finalizeOAuth (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (tokenAndSecret: TokenAndSecret) (verifier: string) =
+let internal finalizeOAuth (config: FlickrConfig) (tokenAndSecret: TokenAndSecret) (verifier: string) =
     async {
-        let! authHeader = generateAuthHeader platform apiKey apiSecret (BeforeAccess (tokenAndSecret, verifier)) [] "GET" ACCESS_TOKEN_URL
-        return! fetchFinalAccessToken platform ACCESS_TOKEN_URL authHeader
+        let! authHeader = generateAuthHeader config (BeforeAccess (tokenAndSecret, verifier)) [] "GET" ACCESS_TOKEN_URL
+        return! fetchFinalAccessToken config ACCESS_TOKEN_URL authHeader
     }
