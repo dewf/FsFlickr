@@ -234,9 +234,8 @@ let private decodeLocation: Decoder<Location> =
         Longitude = get.Required.Field "longitude" (Decode.map float Decode.string)
         Accuracy = get.Required.Field "accuracy" (Decode.map int Decode.string)
         Context = get.Required.Field "context" (Decode.map int Decode.string)
-        Neighborhood = get.Required.Field "neighbourhood" (Decode.object (fun get -> get.Required.Field "woeid" decodeWOEID))
-        Region = get.Required.Field "region" (Decode.object (fun get -> get.Required.Field "woeid" decodeWOEID))
-        Country = get.Required.Field "country" (Decode.object (fun get -> get.Required.Field "woeid" decodeWOEID))
+        // other fields: neighborhood, locality, county, region, country
+        // (kind of complex, they can contain WOEIDs but also _content - not sure which is a priority)
     })
 
 let private decodeUrls: Decoder<Map<string, string>> =

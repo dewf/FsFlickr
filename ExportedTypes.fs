@@ -145,9 +145,9 @@ type Location = {
     Longitude: float
     Accuracy: int
     Context: int
-    Neighborhood: WOEID
-    Region: WOEID
-    Country: WOEID
+    // Neighborhood: WOEID
+    // Region: WOEID
+    // Country: WOEID
 }
 
 type PhotoInfo = {
