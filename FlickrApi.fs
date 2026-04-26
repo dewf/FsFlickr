@@ -4,7 +4,12 @@ open System
 open FlickrOAuth1
 open FsFlickr.Util
 open HttpStuff
+
+#if FABLE_COMPILER
 open Thoth.Json
+#else
+open Thoth.Json.Net
+#endif
 
 let private FLICKR_REST_URL = "https://www.flickr.com/services/rest"
 
@@ -54,12 +59,24 @@ let private flickrMethod (platform: IPlatformContext) (apiKey: string) (apiSecre
     }
 
 // common stuff =========================================
+
+let private decodeNSID =
+    Decode.map NSID Decode.string
+
+let private decodeContentValue (valueDecoder: Decoder<'a>): Decoder<'a> =
+    Decode.object (fun get -> get.Required.Field "_content" valueDecoder)
+
+// let private sizesDecoder: Decoder<string list> =
+//     let f (str: string) =
+//         str.Split(",") |> Array.toList
+//     Decode.map f Decode.string
+
 let private photoCommonDecoder (injectedOwner: NSID option) (get: Decode.IGetters) =
         { Id = get.Required.Field "id" Decode.string
           Owner =
               match injectedOwner with
               | Some owner -> owner
-              | None -> get.Required.Field "owner" (Decode.map NSID Decode.string)
+              | None -> get.Required.Field "owner" decodeNSID
           PathAlias = get.Optional.Field "pathalias" Decode.string
           Title = get.Required.Field "title" Decode.string
           Secret = get.Required.Field "secret" Decode.string
@@ -69,7 +86,7 @@ let private photoCommonDecoder (injectedOwner: NSID option) (get: Decode.IGetter
           Medium240 = get.Optional.Field "url_m" Decode.string }
         // see: https://www.flickr.com/services/api/misc.urls.html
 
-let private timestampToDateTimeDecoder =
+let private decodeStringTimestamp =
     Decode.map (int64 >> timestampToDateTime) Decode.string
 
 let private paginationGetter (get: Decode.IGetters) =
@@ -81,7 +98,7 @@ let private paginationGetter (get: Decode.IGetters) =
 // group lookup by URL =================================
 let private urlsLookupGroupGetter (get: Decode.IGetters) =
     get.Required.Field "group" (Decode.object (fun get -> {
-        Id = get.Required.Field "id" (Decode.map NSID Decode.string)
+        Id = get.Required.Field "id" decodeNSID
         Name = get.Required.Field "groupname" (Decode.object (fun get -> get.Required.Field "_content" Decode.string))
     }))
 
@@ -96,7 +113,7 @@ let internal urlsLookupGroup (platform: IPlatformContext) (apiKey: string) (apiS
 let private groupPhotoDecoder: Decoder<GroupPoolPhoto> =
     Decode.object (fun get ->
         { Common = photoCommonDecoder None get
-          DateAdded = get.Required.Field "dateadded" timestampToDateTimeDecoder })
+          DateAdded = get.Required.Field "dateadded" decodeStringTimestamp })
 
 let private groupPhotosPageGetter (get: Decode.IGetters) =
     get.Required.Field "photos" (Decode.object (fun get->
@@ -117,7 +134,7 @@ let internal getGroupPhotos (platform: IPlatformContext) (apiKey: string) (apiSe
 let private favesPhotoDecoder: Decoder<FavoritesPhoto> =
     Decode.object (fun get ->
         { Common = photoCommonDecoder None get
-          DateFaved = get.Required.Field "date_faved" timestampToDateTimeDecoder
+          DateFaved = get.Required.Field "date_faved" decodeStringTimestamp
           UpgradeSizes = get.Optional.Field "upgrade_sizes" (Decode.list Decode.string) })
 
 let private favoritesPageGetter (get: Decode.IGetters) =
@@ -167,7 +184,7 @@ let internal getPhotoset
 
 let private urlsLookupUserGetter (get: Decode.IGetters) =
     get.Required.Field "user" (Decode.object (fun get ->
-        get.Required.Field "id" (Decode.map NSID Decode.string)
+        get.Required.Field "id" decodeNSID
         ))
 
 let internal urlsLookupUser
@@ -176,3 +193,114 @@ let internal urlsLookupUser
         let args =
             [ "url", url ]
         flickrMethod platform apiKey apiSecret accessToken "flickr.urls.lookupUser" args urlsLookupUserGetter
+
+// photo info ================================================
+
+let private decodeOwner: Decoder<OwnerInfo> =
+    Decode.object (fun get -> {
+        Id = get.Required.Field "nsid" decodeNSID
+        Username = get.Required.Field "username" Decode.string
+        RealName = get.Required.Field "realname" Decode.string
+        Location = get.Optional.Field "location" Decode.string
+        PathAlias = get.Optional.Field "path_alias" Decode.string
+    })
+
+let private datesDecoder: Decoder<Dates> =
+    Decode.object (fun get -> {
+        Posted = get.Required.Field "posted" decodeStringTimestamp
+    })
+
+let private decodeTag: Decoder<Tag> =
+    Decode.object (fun get -> {
+        Id = get.Required.Field "id" Decode.string
+        Author = get.Required.Field "author" decodeNSID
+        AuthorName = get.Required.Field "authorname" Decode.string
+        Raw = get.Required.Field "raw" Decode.string
+        Value = get.Required.Field "_content" Decode.string
+        // MachineTag = get.Required.Field "machine_tag" (Decode.map (fun i -> i = 0 |> not) Decode.int) // sometimes '0', sometimes 'false' ?
+    })
+
+let private decodeTags: Decoder<Tag list> =
+    Decode.object (fun get ->
+        get.Required.Field "tag" (Decode.list decodeTag))
+
+let private decodeWOEID: Decoder<WOEID> =
+    Decode.map (string >> WOEID) Decode.int64
+
+let private decodeLocation: Decoder<Location> =
+    Decode.object (fun get -> {
+        Latitude = get.Required.Field "latitude" (Decode.map float Decode.string)
+        Longitude = get.Required.Field "longitude" (Decode.map float Decode.string)
+        Accuracy = get.Required.Field "accuracy" (Decode.map int Decode.string)
+        Context = get.Required.Field "context" (Decode.map int Decode.string)
+        Neighborhood = get.Required.Field "neighbourhood" (Decode.object (fun get -> get.Required.Field "woeid" decodeWOEID))
+        Region = get.Required.Field "region" (Decode.object (fun get -> get.Required.Field "woeid" decodeWOEID))
+        Country = get.Required.Field "country" (Decode.object (fun get -> get.Required.Field "woeid" decodeWOEID))
+    })
+
+let private decodeUrls: Decoder<Map<string, string>> =
+    let urlDecoder =
+        Decode.object (fun get ->
+            let type_ =
+                get.Required.Field "type" Decode.string
+            let content =
+                get.Required.Field "_content" Decode.string
+            type_, content)
+    Decode.object (fun get ->
+        let pairs =
+            get.Required.Field "url" (Decode.list urlDecoder)
+        Map.ofList pairs)
+
+let private getPhotoInfoGetter (get: Decode.IGetters) =
+    get.Required.Field "photo" (Decode.object (fun get -> {
+        Id = get.Required.Field "id" Decode.string
+        Secret = get.Required.Field "secret" Decode.string
+        Server = get.Required.Field "server" Decode.int
+        Farm = get.Required.Field "farm" Decode.int
+        DateUploaded = get.Required.Field "dateuploaded" decodeStringTimestamp
+        Owner = get.Required.Field "owner" decodeOwner
+        Title = get.Required.Field "title" (decodeContentValue Decode.string)
+        Description = get.Required.Field "description" (decodeContentValue Decode.string)
+        Dates = get.Required.Field "dates" datesDecoder
+        Views = get.Required.Field "views" (Decode.map int64 Decode.string)
+        NumComments = get.Required.Field "comments" (decodeContentValue Decode.int)
+        Tags = get.Required.Field "tags" decodeTags
+        Location = get.Optional.Field "location" decodeLocation
+        Urls = get.Required.Field "urls" decodeUrls
+    }))
+
+let internal getPhotoInfo
+    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (photoId: string) (photoSecret: string option) =
+        let args =
+            [ "photo_id", photoId
+              if photoSecret.IsSome then "secret", photoSecret.Value ]
+        flickrMethod platform apiKey apiSecret accessToken "flickr.photos.getInfo" args getPhotoInfoGetter
+
+let private decodeMedia: Decoder<Media> =
+    let f = function
+        | "photo" -> Photo
+        | "video" -> Video
+        | _ -> failwith "decodeMedia: unknown media type"
+    Decode.map f Decode.string
+
+let private sizeDecoder: Decoder<PhotoSize> =
+    Decode.object (fun get -> {
+        Label = get.Required.Field "label" Decode.string
+        Width = get.Required.Field "width" Decode.int
+        Height = get.Required.Field "height" Decode.int
+        Source = get.Required.Field "source" Decode.string
+        Url = get.Required.Field "url" Decode.string
+        Media = get.Required.Field "media" decodeMedia
+    })
+
+let private getSizesGetter (get: Decode.IGetters) =
+    get.Required.Field "sizes" (Decode.object (fun get ->
+        get.Required.Field "size" (Decode.list sizeDecoder)))
+
+let internal getSizes
+    (platform: IPlatformContext) (apiKey: string) (apiSecret: string) (accessToken: AccessTokenInfo)
+    (photoId: string) =
+        let args =
+            [ "photo_id", photoId ]
+        flickrMethod platform apiKey apiSecret accessToken "flickr.photos.getSizes" args getSizesGetter

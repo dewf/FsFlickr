@@ -1,6 +1,10 @@
 ﻿module FsFlickr.FlickrOAuth1
 
+#if FABLE_COMPILER
 open Thoth.Json
+#else
+open Thoth.Json.Net
+#endif
 
 let private REQUEST_URL = "https://www.flickr.com/services/oauth/request_token"
 let private AUTH_URL = "https://www.flickr.com/services/oauth/authorize"

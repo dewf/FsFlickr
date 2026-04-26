@@ -87,3 +87,9 @@ type FlickrAPI(apiKey: string, apiSecret: string, platform: IPlatformContext) =
 
     member this.UrlsLookupUser (url: string) =
         withAccessToken (fun ati -> urlsLookupUser platform apiKey apiSecret ati url)
+
+    member this.GetPhotoInfo (id: string, ?secret: string) =
+        withAccessToken (fun ati -> getPhotoInfo platform apiKey apiSecret ati id secret)
+
+    member this.GetPhotoSizes (id: string) =
+        withAccessToken (fun ati -> getSizes platform apiKey apiSecret ati id)

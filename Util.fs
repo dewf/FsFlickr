@@ -6,7 +6,7 @@ let internal unixTimestamp () =
     DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 
 let internal timestampToDateTime (ts: int64) =
-    DateTimeOffset.FromUnixTimeSeconds(ts |> int64).LocalDateTime
+    DateTimeOffset.FromUnixTimeSeconds(ts).LocalDateTime
 
 let internal dateTimeToTimestamp (dt: DateTime) =
     DateTimeOffset(dt).ToUnixTimeSeconds()

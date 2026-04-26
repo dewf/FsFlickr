@@ -17,10 +17,24 @@ type OAuthCallback =
 type EndpointError =
     | HttpError of code: int * message: string
     | DecodeError of message: string
+with
+    override this.ToString() =
+        match this with
+        | HttpError (code, message) ->
+            sprintf "HTTP error: (%d) %s" code message
+        | DecodeError message ->
+            sprintf "JSON decode error: %s" message
 
 type FlickrError =
     | MethodError of code: int * message: string
     | EndpointError of err: EndpointError
+with
+    override this.ToString() =
+        match this with
+        | MethodError (code, message) ->
+            sprintf "Flickr method error: (%d) %s" code message
+        | EndpointError err ->
+            sprintf "endpoint error: %A" err
 
 type FlickrApiResult<'a> =
     | FlickrOk of payload: 'a
@@ -107,4 +121,69 @@ type PhotosetPhoto = {
 type PhotosPage<'t> = {
     Pagination: Pagination
     Photos: 't list
+}
+
+type OwnerInfo = {
+    Id: NSID
+    Username: string
+    RealName: string
+    Location: string option
+    PathAlias: string option
+}
+
+type Dates = {
+    Posted: DateTime
+    // more later
+}
+
+type Tag = {
+    Id: string
+    Author: NSID
+    AuthorName: string
+    Raw: string          // formatting (capitals, spaces) intact
+    Value: string
+    // MachineTag: bool
+}
+
+type WOEID =
+    WOEID of string
+
+type Location = {
+    Latitude: float
+    Longitude: float
+    Accuracy: int
+    Context: int
+    Neighborhood: WOEID
+    Region: WOEID
+    Country: WOEID
+}
+
+type PhotoInfo = {
+    Id: string
+    Secret: string
+    Server: int
+    Farm: int
+    DateUploaded: DateTime
+    Owner: OwnerInfo
+    Title: string
+    Description: string
+    Dates: Dates
+    Views: int64
+    NumComments: int
+    Tags: Tag list
+    Location: Location option
+    Urls: Map<string, string> // eg "photopage": URL
+}
+
+type Media =
+    | Photo
+    | Video
+
+type PhotoSize = {
+    Label: string
+    Width: int
+    Height: int
+    Source: string
+    Url: string
+    Media: Media
 }

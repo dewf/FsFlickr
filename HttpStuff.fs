@@ -1,6 +1,10 @@
 module FsFlickr.HttpStuff
 
+#if FABLE_COMPILER
 open Thoth.Json
+#else
+open Thoth.Json.Net
+#endif
 
 type internal ApiResult<'a> =
     | ApiOk of 'a
