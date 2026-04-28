@@ -78,11 +78,11 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
                 return (Error $"FlickrAPI.Verify(): was already in ErrState [{err}]")
         }
 
-    member this.GetGroupId (name: string) =
-        withAccessToken (fun ati -> urlsLookupGroup config ati name)
+    member this.UrlsLookupGroup (url: string) =
+        withAccessToken (fun ati -> urlsLookupGroup config ati url)
 
-    member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int) =
-        withAccessToken (fun ati -> getGroupPhotos config ati id perPage page)
+    member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int, ?userId: NSID) =
+        withAccessToken (fun ati -> getGroupPhotos config ati id perPage page userId)
 
     member this.GetFavorites (?userId: NSID, ?minFaveDate: DateTime, ?maxFaveDate: DateTime, ?perPage: int, ?page: int) =
         withAccessToken (fun ati -> getFavorites config ati userId minFaveDate maxFaveDate perPage page)

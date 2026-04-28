@@ -103,9 +103,7 @@ let private urlsLookupGroupGetter (get: Decode.IGetters) =
         Name = get.Required.Field "groupname" (Decode.object (fun get -> get.Required.Field "_content" Decode.string))
     }))
 
-let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInfo) (name: string) =
-    let url =
-        $"https://www.flickr.com/groups/{name}"
+let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInfo) (url: string) =
     let args =
         [ ("url", url) ]
     flickrMethod config accessToken "flickr.urls.lookupGroup" args urlsLookupGroupGetter
@@ -123,11 +121,12 @@ let private groupPhotosPageGetter (get: Decode.IGetters) =
         ))
 
 let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo)
-    (id: NSID) (perPage: int option) (page: int option) =
+    (id: NSID) (perPage: int option) (page: int option) (userId: NSID option) =
         let args =
             [ "group_id", string id
               if page.IsSome then "page", string page.Value
               if perPage.IsSome then "per_page", string perPage.Value
+              if userId.IsSome then "user_id", string userId.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
         flickrMethod config accessToken "flickr.groups.pools.getPhotos" args groupPhotosPageGetter
 
@@ -184,9 +183,10 @@ let internal getPhotoset
 // look up user by URL =======================================
 
 let private urlsLookupUserGetter (get: Decode.IGetters) =
-    get.Required.Field "user" (Decode.object (fun get ->
-        get.Required.Field "id" decodeNSID
-        ))
+    get.Required.Field "user" (Decode.object (fun get -> {
+        Id = get.Required.Field "id" decodeNSID
+        Username = get.Required.Field "username" (decodeContentValue Decode.string)
+    }))
 
 let internal urlsLookupUser
     (config: FlickrConfig) (accessToken: AccessTokenInfo)

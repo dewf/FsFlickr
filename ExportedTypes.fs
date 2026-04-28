@@ -179,3 +179,8 @@ type PhotoSize = {
     Url: string
     Media: Media
 }
+
+type UserInfo = {
+    Id: NSID
+    Username: string
+}
