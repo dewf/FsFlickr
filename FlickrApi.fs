@@ -14,11 +14,12 @@ open Thoth.Json.Net
 
 let private FLICKR_REST_URL = "https://www.flickr.com/services/rest"
 
-let private flickrRestResultDecoder (subgetter: Decode.IGetters -> 'a): Decoder<FlickrApiResult<'a>> =
+let private flickrRestResultDecoder (payloadField: string) (payloadDecoder: Decoder<'a>): Decoder<FlickrApiResult<'a>> =
     Decode.object (fun get ->
         match get.Required.Field "stat" Decode.string with
         | "ok" ->
-            FlickrOk (subgetter get)
+            get.Required.Field payloadField payloadDecoder
+            |> FlickrOk
         | "fail" ->
             let code =
                 get.Required.Field "code" Decode.int
@@ -29,7 +30,7 @@ let private flickrRestResultDecoder (subgetter: Decode.IGetters -> 'a): Decoder<
         | _ ->
             failwith "jsonResultDecoder: unknown flickr json status")
 
-let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (method: string) (methodArgs: (string * string) list) (subgetter: Decode.IGetters -> 'a) =
+let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (method: string) (methodArgs: (string * string) list) (payloadField: string) (payloadDecoder: Decoder<'a>) =
     let data =
         [ "nojsoncallback", "1"
           "format", "json"
@@ -49,7 +50,7 @@ let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (
         // printfn "raw response: [%A]" response
         let result =
             let decoder =
-                flickrRestResultDecoder subgetter
+                flickrRestResultDecoder payloadField payloadDecoder
             match decodeResponse decoder response with
             | ApiOk flickrResult ->
                 // properly decoded, although it could still technically be a flickr API error
@@ -97,16 +98,16 @@ let private paginationGetter (get: Decode.IGetters) =
       TotalItems = get.Required.Field "total" Decode.int }
 
 // group lookup by URL =================================
-let private urlsLookupGroupGetter (get: Decode.IGetters) =
-    get.Required.Field "group" (Decode.object (fun get -> {
+let private urlsLookupGroupDecoder =
+    Decode.object (fun get -> {
         Id = get.Required.Field "id" decodeNSID
         Name = get.Required.Field "groupname" (Decode.object (fun get -> get.Required.Field "_content" Decode.string))
-    }))
+    })
 
 let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInfo) (url: string) =
     let args =
         [ ("url", url) ]
-    flickrMethod config accessToken "flickr.urls.lookupGroup" args urlsLookupGroupGetter
+    flickrMethod config accessToken "flickr.urls.lookupGroup" args "group" urlsLookupGroupDecoder
 
 // group pool =================================
 let private groupPhotoDecoder: Decoder<GroupPoolPhoto> =
@@ -114,11 +115,10 @@ let private groupPhotoDecoder: Decoder<GroupPoolPhoto> =
         { Common = photoCommonDecoder None get
           DateAdded = get.Required.Field "dateadded" decodeStringTimestamp })
 
-let private groupPhotosPageGetter (get: Decode.IGetters) =
-    get.Required.Field "photos" (Decode.object (fun get->
+let private getGroupPhotosDecoder =
+    Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list groupPhotoDecoder) }
-        ))
+          Photos = get.Required.Field "photo" (Decode.list groupPhotoDecoder) })
 
 let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (id: NSID) (perPage: int option) (page: int option) (userId: NSID option) =
@@ -128,7 +128,7 @@ let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo
               if perPage.IsSome then "per_page", string perPage.Value
               if userId.IsSome then "user_id", string userId.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod config accessToken "flickr.groups.pools.getPhotos" args groupPhotosPageGetter
+        flickrMethod config accessToken "flickr.groups.pools.getPhotos" args "photos" getGroupPhotosDecoder
 
 // favorites ==================================
 let private favesPhotoDecoder: Decoder<FavoritesPhoto> =
@@ -137,11 +137,10 @@ let private favesPhotoDecoder: Decoder<FavoritesPhoto> =
           DateFaved = get.Required.Field "date_faved" decodeStringTimestamp
           UpgradeSizes = get.Optional.Field "upgrade_sizes" (Decode.list Decode.string) })
 
-let private favoritesPageGetter (get: Decode.IGetters) =
-    get.Required.Field "photos" (Decode.object (fun get->
+let private favoritesPageDecoder =
+    Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list favesPhotoDecoder) }
-        ))
+          Photos = get.Required.Field "photo" (Decode.list favesPhotoDecoder) })
 
 let internal getFavorites
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
@@ -154,7 +153,7 @@ let internal getFavorites
               if perPage.IsSome then "per_page", string perPage.Value
               if page.IsSome then "page", string page.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod config accessToken "flickr.favorites.getList" args favoritesPageGetter
+        flickrMethod config accessToken "flickr.favorites.getList" args "photos" favoritesPageDecoder
 
 // photo set =====================================
 
@@ -162,11 +161,10 @@ let private photosetPhotoDecoder (owner: NSID): Decoder<PhotosetPhoto> =
     Decode.object (fun get ->
         { Common = photoCommonDecoder (Some owner) get })
 
-let private photosetPageGetter (owner: NSID) (get: Decode.IGetters) =
-    get.Required.Field "photoset" (Decode.object (fun get->
+let private photosetPageDecoder (owner: NSID) =
+    Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list (photosetPhotoDecoder owner)) }
-        ))
+          Photos = get.Required.Field "photo" (Decode.list (photosetPhotoDecoder owner)) })
 
 let internal getPhotoset
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
@@ -178,22 +176,21 @@ let internal getPhotoset
               if perPage.IsSome then "per_page", string perPage.Value
               if page.IsSome then "page", string page.Value
               "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod config accessToken "flickr.photosets.getPhotos" args (photosetPageGetter userId)
+        flickrMethod config accessToken "flickr.photosets.getPhotos" args "photoset" (photosetPageDecoder userId)
 
 // look up user by URL =======================================
 
-let private urlsLookupUserGetter (get: Decode.IGetters) =
-    get.Required.Field "user" (Decode.object (fun get -> {
+let private urlsLookupUserDecoder =
+    Decode.object (fun get -> {
         Id = get.Required.Field "id" decodeNSID
-        Username = get.Required.Field "username" (decodeContentValue Decode.string)
-    }))
+        Username = get.Required.Field "username" (decodeContentValue Decode.string)})
 
 let internal urlsLookupUser
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (url: string) =
         let args =
             [ "url", url ]
-        flickrMethod config accessToken "flickr.urls.lookupUser" args urlsLookupUserGetter
+        flickrMethod config accessToken "flickr.urls.lookupUser" args "user" urlsLookupUserDecoder
 
 // photo info ================================================
 
@@ -251,8 +248,8 @@ let private decodeUrls: Decoder<Map<string, string>> =
             get.Required.Field "url" (Decode.list urlDecoder)
         Map.ofList pairs)
 
-let private getPhotoInfoGetter (get: Decode.IGetters) =
-    get.Required.Field "photo" (Decode.object (fun get -> {
+let private getPhotoInfoDecoder =
+    Decode.object (fun get -> {
         Id = get.Required.Field "id" Decode.string
         Secret = get.Required.Field "secret" Decode.string
         Server = get.Required.Field "server" Decode.int
@@ -267,7 +264,7 @@ let private getPhotoInfoGetter (get: Decode.IGetters) =
         Tags = get.Required.Field "tags" decodeTags
         Location = get.Optional.Field "location" decodeLocation
         Urls = get.Required.Field "urls" decodeUrls
-    }))
+    })
 
 let internal getPhotoInfo
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
@@ -275,7 +272,7 @@ let internal getPhotoInfo
         let args =
             [ "photo_id", photoId
               if photoSecret.IsSome then "secret", photoSecret.Value ]
-        flickrMethod config accessToken "flickr.photos.getInfo" args getPhotoInfoGetter
+        flickrMethod config accessToken "flickr.photos.getInfo" args "photo" getPhotoInfoDecoder
 
 let private decodeMedia: Decoder<Media> =
     let f = function
@@ -294,13 +291,13 @@ let private sizeDecoder: Decoder<PhotoSize> =
         Media = get.Required.Field "media" decodeMedia
     })
 
-let private getSizesGetter (get: Decode.IGetters) =
-    get.Required.Field "sizes" (Decode.object (fun get ->
-        get.Required.Field "size" (Decode.list sizeDecoder)))
+let private getSizesDecoder =
+    Decode.object (fun get ->
+        get.Required.Field "size" (Decode.list sizeDecoder))
 
 let internal getSizes
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (photoId: string) =
         let args =
             [ "photo_id", photoId ]
-        flickrMethod config accessToken "flickr.photos.getSizes" args getSizesGetter
+        flickrMethod config accessToken "flickr.photos.getSizes" args "sizes" getSizesDecoder
