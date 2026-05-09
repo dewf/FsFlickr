@@ -47,7 +47,7 @@ let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (
             sprintf "%s?%s" FLICKR_REST_URL queryString
         let! response =
             Platform.httpGetWithAuthHeader config url authHeader
-        // printfn "raw response: [%A]" response
+        printfn "raw response: [%A]" response
         let result =
             let decoder =
                 flickrRestResultDecoder payloadField payloadDecoder
@@ -78,7 +78,7 @@ let extrasGetter (requested: Extra seq) (get: Decode.IGetters) =
                 Ok (float str)
             else
                 Error (path, BadPrimitive("lat/long value", value))
-    let decodeGeo (get: Decode.IGetters) =
+    let getGeo (get: Decode.IGetters) =
         { Latitude = get.Optional.Field "latitude" latLongDecoder
           Longitude = get.Optional.Field "longitude" latLongDecoder
           Accuracy = get.Optional.Field "accuracy" Decode.int
@@ -93,7 +93,7 @@ let extrasGetter (requested: Extra seq) (get: Decode.IGetters) =
             str.Split(" ")
             |> Array.toList
         Decode.map spaceSplitter Decode.string
-    let decodeMedia (get: Decode.IGetters) =
+    let getMedia (get: Decode.IGetters) =
         let maybeKind = get.Optional.Field "media" Decode.string
         let maybeStatus = get.Optional.Field "media_status" Decode.string
         match maybeKind, maybeStatus with
@@ -103,6 +103,22 @@ let extrasGetter (requested: Extra seq) (get: Decode.IGetters) =
             None
     let contentDecoder actual =
         Decode.object (fun get -> get.Required.Field "_content" actual)
+    let getOriginalDimensions (get: Decode.IGetters) =
+        let maybeWidth = get.Optional.Field "o_width" (Decode.map int Decode.string)
+        let maybeHeight = get.Optional.Field "o_height" (Decode.map int Decode.string)
+        match maybeWidth, maybeHeight with
+        | Some width, Some height ->
+            Some { Width = width; Height = height }
+        | _ ->
+            None
+    let getOriginalFormat (get: Decode.IGetters) =
+        let maybeFormat = get.Optional.Field "originalformat" Decode.string
+        let maybeSecret = get.Optional.Field "originalsecret" Decode.string
+        match maybeFormat, maybeSecret with
+        | Some format, Some secret ->
+            Some { Format = format; Secret = secret }
+        | _ ->
+            None
     let foldFunc (acc: Extras) (extra: Extra) =
         match extra with
         | Extra.Description ->
@@ -114,25 +130,25 @@ let extrasGetter (requested: Extra seq) (get: Decode.IGetters) =
         | Extra.DateTaken ->
             { acc with DateTaken = get.Optional.Field "date_taken" decodeStringTimestamp }
         | Extra.OwnerName ->
-            { acc with OwnerName = get.Optional.Field "owner_name" Decode.string }
+            { acc with OwnerName = get.Optional.Field "ownername" Decode.string }
         | Extra.IconServer ->
             { acc with IconServer = get.Optional.Field "icon_server" Decode.int }
         | Extra.OriginalFormat ->
-            failwith "Extra.OriginalFormat: TODO"
+            { acc with OriginalFormat = getOriginalFormat get }
         | Extra.LastUpdate ->
             { acc with LastUpdate = get.Optional.Field "last_update" decodeStringTimestamp }
         | Extra.Geo ->
-            { acc with Geo = decodeGeo get |> Some }
+            { acc with Geo = getGeo get |> Some }
         | Extra.Tags ->
             { acc with Tags = get.Optional.Field "tags" decodeTags }
         | Extra.MachineTags ->
             { acc with MachineTags = get.Optional.Field "machine_tags" decodeTags }
         | Extra.OriginalDimensions ->
-            failwith "Extra.OriginalDimensions: TODO"
+            { acc with OriginalDimensions = getOriginalDimensions get }
         | Extra.Views ->
             { acc with Views = get.Optional.Field "views" Decode.int64 }
         | Extra.Media ->
-            { acc with Media = decodeMedia get }
+            { acc with Media = getMedia get }
         | Extra.PathAlias ->
             { acc with PathAlias = get.Optional.Field "path_alias" Decode.string }
         | Extra.UrlThumb75 ->

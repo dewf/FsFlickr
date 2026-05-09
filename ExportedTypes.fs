@@ -113,6 +113,16 @@ type MediaValue = {
     Status: string  // ready/pending
 }
 
+type Dimensions = {
+    Width: int
+    Height: int
+}
+
+type OriginalFormat = {
+    Format: string
+    Secret: string
+}
+
 type Extras = {
     Description: string option
     License: int option             // see flickr.photos.licenses.getInfo for official mapping
@@ -120,12 +130,12 @@ type Extras = {
     DateTaken: DateTime option
     OwnerName: string option        // or NSID?
     IconServer: int option
-    OriginalFormat: int option      // dunno!
+    OriginalFormat: OriginalFormat option
     LastUpdate: DateTime option
     Geo: GeoValue option
     Tags: string list option
     MachineTags: string list option
-    OriginalDimensions: int option  // no idea
+    OriginalDimensions: Dimensions option
     Views: int64 option
     Media: MediaValue option
     PathAlias: string option
