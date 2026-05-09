@@ -47,7 +47,7 @@ let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (
             sprintf "%s?%s" FLICKR_REST_URL queryString
         let! response =
             Platform.httpGetWithAuthHeader config url authHeader
-        printfn "raw response: [%A]" response
+        // printfn "raw response: [%A]" response
         let result =
             let decoder =
                 flickrRestResultDecoder payloadField payloadDecoder
