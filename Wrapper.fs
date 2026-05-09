@@ -81,14 +81,17 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
     member this.UrlsLookupGroup (url: string) =
         withAccessToken (fun ati -> urlsLookupGroup config ati url)
 
-    member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int, ?userId: NSID) =
-        withAccessToken (fun ati -> getGroupPhotos config ati id perPage page userId)
+    member this.GetGroupPhotos (id: NSID, ?perPage: int, ?page: int, ?userId: NSID, ?extras: Extra seq) =
+        let extras' = defaultArg extras Seq.empty
+        withAccessToken (fun ati -> getGroupPhotos config ati id perPage page userId extras')
 
-    member this.GetFavorites (?userId: NSID, ?minFaveDate: DateTime, ?maxFaveDate: DateTime, ?perPage: int, ?page: int) =
-        withAccessToken (fun ati -> getFavorites config ati userId minFaveDate maxFaveDate perPage page)
+    member this.GetFavorites (?userId: NSID, ?minFaveDate: DateTime, ?maxFaveDate: DateTime, ?perPage: int, ?page: int, ?extras: Extra seq) =
+        let extras' = defaultArg extras Seq.empty
+        withAccessToken (fun ati -> getFavorites config ati userId minFaveDate maxFaveDate perPage page extras')
 
-    member this.GetPhotoSet (userId: NSID, photosetId: string, ?perPage: int, ?page: int) =
-        withAccessToken (fun ati -> getPhotoset config ati userId photosetId perPage page)
+    member this.GetPhotoSet (userId: NSID, photosetId: string, ?perPage: int, ?page: int, ?extras: Extra seq) =
+        let extras' = defaultArg extras Seq.empty
+        withAccessToken (fun ati -> getPhotoset config ati userId photosetId perPage page extras')
 
     member this.UrlsLookupUser (url: string) =
         withAccessToken (fun ati -> urlsLookupUser config ati url)

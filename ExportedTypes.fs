@@ -65,21 +65,161 @@ type InContext =
     | InPool of name: string
     | InFavorites of nsid: NSID
 
+type Extra =
+    | Description = 0
+    | License = 1
+    | DateUploaded = 2    // date_upload
+    | DateTaken = 3
+    | OwnerName = 4
+    | IconServer = 5
+    | OriginalFormat = 6
+    | LastUpdate = 7
+    | Geo = 8
+    | Tags = 9
+    | MachineTags = 10
+    | OriginalDimensions = 11 // o_dims
+    | Views = 12
+    | Media = 13
+    | PathAlias = 14
+    // see https://www.flickr.com/services/api/misc.urls.html
+    // and https://www.flickr.com/services/api/flickr.favorites.getList.html
+    // confusing, because they don't line up exactly
+    | UrlThumb75 = 15         // url_sq
+    | UrlThumb100 = 16        // url_t
+    | UrlThumb150 = 18        // url_q
+    | UrlSmall240 = 17        // url_s
+    | UrlSmall320 = 20        // url_n
+    // small 400 missing?
+    | UrlMedium500 = 19       // url_m
+    | UrlMedium640 = 21       // url_z
+    | UrlMedium800 = 22       // url_c
+    | UrlLarge1024 = 23       // url_l (maybe)
+    | UrlOriginal = 24        // url_o
+
+type GeoValue = {
+    Latitude: float option
+    Longitude: float option
+    Accuracy: int option
+    PlaceId: string option   // not sure
+    WoeId: int64 option      // numeric, not sure width
+    GeoIsPublic: bool option
+    GeoIsContact: bool option
+    GeoIsFriend: bool option
+    GeoIsFamily: bool option
+}
+
+type MediaValue = {
+    Kind: string    // photo/video
+    Status: string  // ready/pending
+}
+
+type Extras = {
+    Description: string option
+    License: int option             // see flickr.photos.licenses.getInfo for official mapping
+    DateUploaded: DateTime option
+    DateTaken: DateTime option
+    OwnerName: string option        // or NSID?
+    IconServer: int option
+    OriginalFormat: int option      // dunno!
+    LastUpdate: DateTime option
+    Geo: GeoValue option
+    Tags: string list option
+    MachineTags: string list option
+    OriginalDimensions: int option  // no idea
+    Views: int64 option
+    Media: MediaValue option
+    PathAlias: string option
+    UrlThumb75: string option
+    UrlThumb100: string option      // url_t
+    UrlThumb150: string option      // url_q
+    UrlSmall240: string option      // url_s
+    UrlSmall320: string option      // url_n
+    // small 400 missing?
+    UrlMedium500: string option     // url_m
+    UrlMedium640: string option     // url_z
+    UrlMedium800: string option     // url_c
+    UrlLarge1024: string option     // url_l
+    UrlOriginal: string option      // url_o
+}
+
+module internal Extras =
+    let empty = {
+        Description = None
+        License = None
+        DateUploaded = None
+        DateTaken = None
+        OwnerName = None
+        IconServer = None
+        OriginalFormat = None
+        LastUpdate = None
+        Geo = None
+        Tags = None
+        MachineTags = None
+        OriginalDimensions = None
+        Views = None
+        Media = None
+        PathAlias = None
+        UrlThumb75 = None
+        UrlThumb100 = None
+        UrlThumb150 = None
+        UrlSmall240 = None
+        UrlSmall320 = None
+        UrlMedium500 = None
+        UrlMedium640 = None
+        UrlMedium800 = None
+        UrlLarge1024 = None
+        UrlOriginal = None
+    }
+    let private extraToKey (extra: Extra) =
+        match extra with
+        | Extra.Description -> "description"
+        | Extra.License -> "license"
+        | Extra.DateUploaded -> "date_upload"
+        | Extra.DateTaken -> "date_taken"
+        | Extra.OwnerName -> "owner_name"
+        | Extra.IconServer -> "icon_server"
+        | Extra.OriginalFormat -> "original_format"
+        | Extra.LastUpdate -> "last_update"
+        | Extra.Geo -> "geo"
+        | Extra.Tags -> "tags"
+        | Extra.MachineTags -> "machine_tags"
+        | Extra.OriginalDimensions -> "o_dims"
+        | Extra.Views -> "views"
+        | Extra.Media -> "media"
+        | Extra.PathAlias -> "path_alias"
+        | Extra.UrlThumb75 -> "url_sq"
+        | Extra.UrlThumb100 -> "url_t"
+        | Extra.UrlThumb150 -> "url_q"
+        | Extra.UrlSmall240 -> "url_s"
+        | Extra.UrlSmall320 -> "url_n"
+        | Extra.UrlMedium500 -> "url_m"
+        | Extra.UrlMedium640 -> "url_z"
+        | Extra.UrlMedium800 -> "url_c"
+        | Extra.UrlLarge1024 -> "url_l"
+        | Extra.UrlOriginal -> "url_o"
+        | _ -> failwith "Extras.extraToKey - out of range"
+    let extrasToKeys (extras: Extra seq) =
+        let keys =
+            extras
+            |> Seq.map extraToKey
+        String.Join(",", keys)
+
 type PhotoCommon = {
     Id: string
     Owner: NSID
-    PathAlias: string option
     Title: string
     Secret: string
     Server: int
     Farm: int
-    Square150: string
-    Medium240: string option
+    Extras: Extras
 } with
     member this.FlickrUrl (context: InContext) =
         let pathSegment =
-            this.PathAlias
-            |> Option.defaultValue (string this.Owner)
+            match this.Extras.PathAlias with
+            | Some pathAlias ->
+                pathAlias
+            | _ ->
+                string this.Owner
         let inTail =
             match context with
             | NoContext -> ""

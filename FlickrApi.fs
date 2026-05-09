@@ -62,6 +62,104 @@ let private flickrMethod (config: FlickrConfig) (accessToken: AccessTokenInfo) (
 
 // common stuff =========================================
 
+let private decodeStringTimestamp =
+    Decode.map (int64 >> timestampToDateTime) Decode.string
+
+let extrasGetter (requested: Extra seq) (get: Decode.IGetters) =
+    let decodeIntAsBool =
+        Decode.map (fun x -> x <> 0) Decode.int
+    let latLongDecoder =
+        fun path value ->
+            if Decode.Helpers.isNumber value then
+                let num: float = unbox value
+                Ok (float num)
+            elif Decode.Helpers.isString value then
+                let str: string = unbox value
+                Ok (float str)
+            else
+                Error (path, BadPrimitive("lat/long value", value))
+    let decodeGeo (get: Decode.IGetters) =
+        { Latitude = get.Optional.Field "latitude" latLongDecoder
+          Longitude = get.Optional.Field "longitude" latLongDecoder
+          Accuracy = get.Optional.Field "accuracy" Decode.int
+          PlaceId = get.Optional.Field "place_id" Decode.string
+          WoeId = get.Optional.Field "woeid" Decode.int64
+          GeoIsPublic = get.Optional.Field "geo_is_public" decodeIntAsBool
+          GeoIsContact = get.Optional.Field "geo_is_contact" decodeIntAsBool
+          GeoIsFriend = get.Optional.Field "get_is_friend" decodeIntAsBool
+          GeoIsFamily = get.Optional.Field "geo_is_family" decodeIntAsBool }
+    let decodeTags =
+        let spaceSplitter (str: string) =
+            str.Split(" ")
+            |> Array.toList
+        Decode.map spaceSplitter Decode.string
+    let decodeMedia (get: Decode.IGetters) =
+        let maybeKind = get.Optional.Field "media" Decode.string
+        let maybeStatus = get.Optional.Field "media_status" Decode.string
+        match maybeKind, maybeStatus with
+        | Some kind, Some status ->
+            Some { Kind = kind; Status = status }
+        | _ ->
+            None
+    let contentDecoder actual =
+        Decode.object (fun get -> get.Required.Field "_content" actual)
+    let foldFunc (acc: Extras) (extra: Extra) =
+        match extra with
+        | Extra.Description ->
+            { acc with Description = get.Optional.Field "description" (contentDecoder Decode.string) }
+        | Extra.License ->
+            { acc with License = get.Optional.Field "license" Decode.int }
+        | Extra.DateUploaded ->
+            { acc with DateUploaded = get.Optional.Field "date_upload" decodeStringTimestamp }
+        | Extra.DateTaken ->
+            { acc with DateTaken = get.Optional.Field "date_taken" decodeStringTimestamp }
+        | Extra.OwnerName ->
+            { acc with OwnerName = get.Optional.Field "owner_name" Decode.string }
+        | Extra.IconServer ->
+            { acc with IconServer = get.Optional.Field "icon_server" Decode.int }
+        | Extra.OriginalFormat ->
+            failwith "Extra.OriginalFormat: TODO"
+        | Extra.LastUpdate ->
+            { acc with LastUpdate = get.Optional.Field "last_update" decodeStringTimestamp }
+        | Extra.Geo ->
+            { acc with Geo = decodeGeo get |> Some }
+        | Extra.Tags ->
+            { acc with Tags = get.Optional.Field "tags" decodeTags }
+        | Extra.MachineTags ->
+            { acc with MachineTags = get.Optional.Field "machine_tags" decodeTags }
+        | Extra.OriginalDimensions ->
+            failwith "Extra.OriginalDimensions: TODO"
+        | Extra.Views ->
+            { acc with Views = get.Optional.Field "views" Decode.int64 }
+        | Extra.Media ->
+            { acc with Media = decodeMedia get }
+        | Extra.PathAlias ->
+            { acc with PathAlias = get.Optional.Field "path_alias" Decode.string }
+        | Extra.UrlThumb75 ->
+            { acc with UrlThumb75 = get.Optional.Field "url_sq" Decode.string }
+        | Extra.UrlThumb100 ->
+            { acc with UrlThumb100 = get.Optional.Field "url_t" Decode.string }
+        | Extra.UrlThumb150 ->
+            { acc with UrlThumb150 = get.Optional.Field "url_q" Decode.string }
+        | Extra.UrlSmall240 ->
+            { acc with UrlSmall240 = get.Optional.Field "url_s" Decode.string }
+        | Extra.UrlSmall320 ->
+            { acc with UrlSmall320 = get.Optional.Field "url_n" Decode.string }
+        | Extra.UrlMedium500 ->
+            { acc with UrlMedium500 = get.Optional.Field "url_m" Decode.string }
+        | Extra.UrlMedium640 ->
+            { acc with UrlMedium640 = get.Optional.Field "url_z" Decode.string }
+        | Extra.UrlMedium800 ->
+            { acc with UrlMedium800 = get.Optional.Field "url_c" Decode.string }
+        | Extra.UrlLarge1024 ->
+            { acc with UrlLarge1024 = get.Optional.Field "url_l" Decode.string }
+        | Extra.UrlOriginal ->
+            { acc with UrlOriginal = get.Optional.Field "url_o" Decode.string }
+        | _ ->
+            failwith "extrasGetter/foldFunc: Extra out of range"
+    (Extras.empty, requested)
+    ||> Seq.fold foldFunc
+
 let private decodeNSID =
     Decode.map NSID Decode.string
 
@@ -73,23 +171,17 @@ let private decodeContentValue (valueDecoder: Decoder<'a>): Decoder<'a> =
 //         str.Split(",") |> Array.toList
 //     Decode.map f Decode.string
 
-let private photoCommonDecoder (injectedOwner: NSID option) (get: Decode.IGetters) =
+let private photoCommonDecoder (injectedOwner: NSID option) (extras: Extra seq) (get: Decode.IGetters) =
         { Id = get.Required.Field "id" Decode.string
           Owner =
               match injectedOwner with
               | Some owner -> owner
               | None -> get.Required.Field "owner" decodeNSID
-          PathAlias = get.Optional.Field "pathalias" Decode.string
           Title = get.Required.Field "title" Decode.string
           Secret = get.Required.Field "secret" Decode.string
           Server = get.Required.Field "server" Decode.int
           Farm = get.Required.Field "farm" Decode.int
-          Square150 = get.Required.Field "url_q" Decode.string
-          Medium240 = get.Optional.Field "url_m" Decode.string }
-        // see: https://www.flickr.com/services/api/misc.urls.html
-
-let private decodeStringTimestamp =
-    Decode.map (int64 >> timestampToDateTime) Decode.string
+          Extras = extrasGetter extras get }
 
 let private paginationGetter (get: Decode.IGetters) =
     { CurrentPage = get.Required.Field "page" Decode.int
@@ -110,73 +202,76 @@ let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInf
     flickrMethod config accessToken "flickr.urls.lookupGroup" args "group" urlsLookupGroupDecoder
 
 // group pool =================================
-let private groupPhotoDecoder: Decoder<GroupPoolPhoto> =
+let private groupPhotoDecoder (extras: Extra seq): Decoder<GroupPoolPhoto> =
     Decode.object (fun get ->
-        { Common = photoCommonDecoder None get
+        { Common = photoCommonDecoder None extras get
           DateAdded = get.Required.Field "dateadded" decodeStringTimestamp })
 
-let private getGroupPhotosDecoder =
+let private getGroupPhotosDecoder (extras: Extra seq) =
     Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list groupPhotoDecoder) })
+          Photos = get.Required.Field "photo" (Decode.list (groupPhotoDecoder extras)) })
 
 let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo)
-    (id: NSID) (perPage: int option) (page: int option) (userId: NSID option) =
+    (id: NSID) (perPage: int option) (page: int option) (userId: NSID option)
+    (extras: Extra seq) =
         let args =
             [ "group_id", string id
               if page.IsSome then "page", string page.Value
               if perPage.IsSome then "per_page", string perPage.Value
               if userId.IsSome then "user_id", string userId.Value
-              "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod config accessToken "flickr.groups.pools.getPhotos" args "photos" getGroupPhotosDecoder
+              "extras", extras |> Extras.extrasToKeys ]
+        flickrMethod config accessToken "flickr.groups.pools.getPhotos" args "photos" (getGroupPhotosDecoder extras)
 
 // favorites ==================================
-let private favesPhotoDecoder: Decoder<FavoritesPhoto> =
+let private favesPhotoDecoder (extras: Extra seq): Decoder<FavoritesPhoto> =
     Decode.object (fun get ->
-        { Common = photoCommonDecoder None get
+        { Common = photoCommonDecoder None extras get
           DateFaved = get.Required.Field "date_faved" decodeStringTimestamp
           UpgradeSizes = get.Optional.Field "upgrade_sizes" (Decode.list Decode.string) })
 
-let private favoritesPageDecoder =
+let private favoritesPageDecoder (extras: Extra seq) =
     Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list favesPhotoDecoder) })
+          Photos = get.Required.Field "photo" (Decode.list (favesPhotoDecoder extras)) })
 
 let internal getFavorites
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (userId: NSID option) (minDate: DateTime option) (maxDate: DateTime option)
-    (perPage: int option) (page: int option) =
+    (perPage: int option) (page: int option)
+    (extras: Extra seq) =
         let args =
             [ if userId.IsSome then "user_id", string userId.Value
               if minDate.IsSome then "min_fave_date", dateTimeToTimestamp minDate.Value |> string
               if maxDate.IsSome then "max_fave_date", dateTimeToTimestamp maxDate.Value |> string
               if perPage.IsSome then "per_page", string perPage.Value
               if page.IsSome then "page", string page.Value
-              "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod config accessToken "flickr.favorites.getList" args "photos" favoritesPageDecoder
+              "extras", extras |> Extras.extrasToKeys ]
+        flickrMethod config accessToken "flickr.favorites.getList" args "photos" (favoritesPageDecoder extras)
 
 // photo set =====================================
 
-let private photosetPhotoDecoder (owner: NSID): Decoder<PhotosetPhoto> =
+let private photosetPhotoDecoder (owner: NSID) (extras: Extra seq): Decoder<PhotosetPhoto> =
     Decode.object (fun get ->
-        { Common = photoCommonDecoder (Some owner) get })
+        { Common = photoCommonDecoder (Some owner) extras get })
 
-let private photosetPageDecoder (owner: NSID) =
+let private photosetPageDecoder (owner: NSID) (extras: Extra seq) =
     Decode.object (fun get->
         { Pagination = paginationGetter get
-          Photos = get.Required.Field "photo" (Decode.list (photosetPhotoDecoder owner)) })
+          Photos = get.Required.Field "photo" (Decode.list (photosetPhotoDecoder owner extras)) })
 
 let internal getPhotoset
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (userId: NSID) (photosetId: string)
-    (perPage: int option) (page: int option) =
+    (perPage: int option) (page: int option)
+    (extras: Extra seq) =
         let args =
             [ "photoset_id", photosetId
               "user_id", string userId
               if perPage.IsSome then "per_page", string perPage.Value
               if page.IsSome then "page", string page.Value
-              "extras", "o_dims, url_q, url_m, path_alias" ]
-        flickrMethod config accessToken "flickr.photosets.getPhotos" args "photoset" (photosetPageDecoder userId)
+              "extras", extras |> Extras.extrasToKeys ]
+        flickrMethod config accessToken "flickr.photosets.getPhotos" args "photoset" (photosetPageDecoder userId extras)
 
 // look up user by URL =======================================
 
