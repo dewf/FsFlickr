@@ -86,11 +86,11 @@ type Extra =
     // confusing, because they don't line up exactly
     | UrlThumb75 = 15         // url_sq
     | UrlThumb100 = 16        // url_t
-    | UrlThumb150 = 18        // url_q
-    | UrlSmall240 = 17        // url_s
-    | UrlSmall320 = 20        // url_n
+    | UrlThumb150 = 17        // url_q
+    | UrlSmall240 = 18        // url_s
+    | UrlSmall320 = 19        // url_n
     // small 400 missing?
-    | UrlMedium500 = 19       // url_m
+    | UrlMedium500 = 20       // url_m
     | UrlMedium640 = 21       // url_z
     | UrlMedium800 = 22       // url_c
     | UrlLarge1024 = 23       // url_l (maybe)
@@ -214,7 +214,7 @@ module internal Extras =
             |> Seq.map extraToKey
         String.Join(",", keys)
 
-type PhotoCommon = {
+type internal PhotoBaseDto = {
     Id: string
     Owner: NSID
     Title: string
@@ -222,14 +222,21 @@ type PhotoCommon = {
     Server: int
     Farm: int
     Extras: Extras
-} with
-    member this.FlickrUrl (context: InContext) =
+}
+
+type PhotoBase internal (dto: PhotoBaseDto) =
+    member val Id = dto.Id
+    member val Owner = dto.Owner
+    member val Title = dto.Title
+    member val Secret = dto.Secret
+    member val Server = dto.Server
+    member val Farm = dto.Farm
+    member val Extras = dto.Extras
+    member this.FlickrUrl(context: InContext) =
         let pathSegment =
             match this.Extras.PathAlias with
-            | Some pathAlias ->
-                pathAlias
-            | _ ->
-                string this.Owner
+            | Some pathAlias -> pathAlias
+            | _ -> string this.Owner
         let inTail =
             match context with
             | NoContext -> ""
@@ -244,21 +251,18 @@ type Pagination = {
     TotalItems: int
 }
 
-type GroupPoolPhoto = {
-    Common: PhotoCommon
-    DateAdded: DateTime
-}
+type GroupPoolPhoto internal (dto: PhotoBaseDto, dateAdded: DateTime) =
+    inherit PhotoBase(dto)
+    member val DateAdded = dateAdded
 
-type FavoritesPhoto = {
-    Common: PhotoCommon
-    DateFaved: DateTime
-    UpgradeSizes: string list option
-}
+type FavoritesPhoto internal (dto: PhotoBaseDto, dateFaved: DateTime, upgradeSizes: string list option) =
+    inherit PhotoBase(dto)
+    member val DateFaved = dateFaved
+    member val UpgradeSizes = upgradeSizes
 
-type PhotosetPhoto = {
-    Common: PhotoCommon
+type PhotosetPhoto internal (dto: PhotoBaseDto) =
+    inherit PhotoBase(dto)
     // no extra fields yet
-}
 
 type PhotosPage<'t> = {
     Pagination: Pagination

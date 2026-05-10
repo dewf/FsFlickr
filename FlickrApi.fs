@@ -187,17 +187,17 @@ let private decodeContentValue (valueDecoder: Decoder<'a>): Decoder<'a> =
 //         str.Split(",") |> Array.toList
 //     Decode.map f Decode.string
 
-let private photoCommonDecoder (injectedOwner: NSID option) (extras: Extra seq) (get: Decode.IGetters) =
-        { Id = get.Required.Field "id" Decode.string
-          Owner =
-              match injectedOwner with
-              | Some owner -> owner
-              | None -> get.Required.Field "owner" decodeNSID
-          Title = get.Required.Field "title" Decode.string
-          Secret = get.Required.Field "secret" Decode.string
-          Server = get.Required.Field "server" Decode.int
-          Farm = get.Required.Field "farm" Decode.int
-          Extras = extrasGetter extras get }
+let private photoCommonDecoder (injectedOwner: NSID option) (extras: Extra seq) (get: Decode.IGetters): PhotoBaseDto =
+    { Id = get.Required.Field "id" Decode.string
+      Owner =
+           match injectedOwner with
+           | Some owner -> owner
+           | None -> get.Required.Field "owner" decodeNSID
+      Title = get.Required.Field "title" Decode.string
+      Secret = get.Required.Field "secret" Decode.string
+      Server = get.Required.Field "server" Decode.int
+      Farm = get.Required.Field "farm" Decode.int
+      Extras = extrasGetter extras get }
 
 let private paginationGetter (get: Decode.IGetters) =
     { CurrentPage = get.Required.Field "page" Decode.int
@@ -220,8 +220,11 @@ let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInf
 // group pool =================================
 let private groupPhotoDecoder (extras: Extra seq): Decoder<GroupPoolPhoto> =
     Decode.object (fun get ->
-        { Common = photoCommonDecoder None extras get
-          DateAdded = get.Required.Field "dateadded" decodeStringTimestamp })
+        let common =
+            photoCommonDecoder None extras get
+        let dateAdded =
+            get.Required.Field "dateadded" decodeStringTimestamp
+        GroupPoolPhoto(common, dateAdded))
 
 let private getGroupPhotosDecoder (extras: Extra seq) =
     Decode.object (fun get->
@@ -242,9 +245,13 @@ let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo
 // favorites ==================================
 let private favesPhotoDecoder (extras: Extra seq): Decoder<FavoritesPhoto> =
     Decode.object (fun get ->
-        { Common = photoCommonDecoder None extras get
-          DateFaved = get.Required.Field "date_faved" decodeStringTimestamp
-          UpgradeSizes = get.Optional.Field "upgrade_sizes" (Decode.list Decode.string) })
+        let common =
+            photoCommonDecoder None extras get
+        let dateFaved =
+            get.Required.Field "date_faved" decodeStringTimestamp
+        let upgradeSizes =
+            get.Optional.Field "upgrade_sizes" (Decode.list Decode.string)
+        FavoritesPhoto(common, dateFaved, upgradeSizes))
 
 let private favoritesPageDecoder (extras: Extra seq) =
     Decode.object (fun get->
@@ -269,7 +276,9 @@ let internal getFavorites
 
 let private photosetPhotoDecoder (owner: NSID) (extras: Extra seq): Decoder<PhotosetPhoto> =
     Decode.object (fun get ->
-        { Common = photoCommonDecoder (Some owner) extras get })
+        let common =
+            photoCommonDecoder (Some owner) extras get
+        PhotosetPhoto(common))
 
 let private photosetPageDecoder (owner: NSID) (extras: Extra seq) =
     Decode.object (fun get->
