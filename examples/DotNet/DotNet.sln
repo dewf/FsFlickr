@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DotNet", "DotNet.fsproj", "{3D394B3D-E228-4C5F-A6C6-349526782781}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsFlickrNET", "..\..\FsFlickrNET.fsproj", "{1E4D1042-016D-4C48-840F-89A96862295F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3D394B3D-E228-4C5F-A6C6-349526782781}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D394B3D-E228-4C5F-A6C6-349526782781}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D394B3D-E228-4C5F-A6C6-349526782781}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D394B3D-E228-4C5F-A6C6-349526782781}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E4D1042-016D-4C48-840F-89A96862295F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E4D1042-016D-4C48-840F-89A96862295F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E4D1042-016D-4C48-840F-89A96862295F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E4D1042-016D-4C48-840F-89A96862295F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
