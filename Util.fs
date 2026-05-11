@@ -1,17 +1,17 @@
-﻿module FsFlickr.Util
+﻿module internal FsFlickr.Util
 
 open System
 
-let internal unixTimestamp () =
+let unixTimestamp () =
     DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 
-let internal timestampToDateTime (ts: int64) =
+let timestampToDateTime (ts: int64) =
     DateTimeOffset.FromUnixTimeSeconds(ts).LocalDateTime
 
-let internal dateTimeToTimestamp (dt: DateTime) =
+let dateTimeToTimestamp (dt: DateTime) =
     DateTimeOffset(dt).ToUnixTimeSeconds()
 
-let internal mapToQueryString (map: Map<string, string>) =
+let mapToQueryString (map: Map<string, string>) =
     // since browser has UrlSearchParams(), should this be provided by platform context instead?
     map
     |> Map.toList

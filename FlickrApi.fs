@@ -1,4 +1,4 @@
-﻿module FsFlickr.FlickrApi
+﻿module internal FsFlickr.FlickrApi
 
 open System
 open FlickrOAuth1
@@ -212,7 +212,7 @@ let private urlsLookupGroupDecoder =
         Name = get.Required.Field "groupname" (Decode.object (fun get -> get.Required.Field "_content" Decode.string))
     })
 
-let internal urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInfo) (url: string) =
+let urlsLookupGroup (config: FlickrConfig) (accessToken: AccessTokenInfo) (url: string) =
     let args =
         [ ("url", url) ]
     flickrMethod config accessToken "flickr.urls.lookupGroup" args "group" urlsLookupGroupDecoder
@@ -231,7 +231,7 @@ let private getGroupPhotosDecoder (extras: Extra seq) =
         { Pagination = paginationGetter get
           Photos = get.Required.Field "photo" (Decode.list (groupPhotoDecoder extras)) })
 
-let internal getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo)
+let getGroupPhotos (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (id: NSID) (perPage: int option) (page: int option) (userId: NSID option)
     (extras: Extra seq) =
         let args =
@@ -258,7 +258,7 @@ let private favoritesPageDecoder (extras: Extra seq) =
         { Pagination = paginationGetter get
           Photos = get.Required.Field "photo" (Decode.list (favesPhotoDecoder extras)) })
 
-let internal getFavorites
+let getFavorites
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (userId: NSID option) (minDate: DateTime option) (maxDate: DateTime option)
     (perPage: int option) (page: int option)
@@ -285,7 +285,7 @@ let private photosetPageDecoder (owner: NSID) (extras: Extra seq) =
         { Pagination = paginationGetter get
           Photos = get.Required.Field "photo" (Decode.list (photosetPhotoDecoder owner extras)) })
 
-let internal getPhotoset
+let getPhotoset
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (userId: NSID) (photosetId: string)
     (perPage: int option) (page: int option)
@@ -305,7 +305,7 @@ let private urlsLookupUserDecoder =
         Id = get.Required.Field "id" decodeNSID
         Username = get.Required.Field "username" (decodeContentValue Decode.string)})
 
-let internal urlsLookupUser
+let urlsLookupUser
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (url: string) =
         let args =
@@ -386,7 +386,7 @@ let private getPhotoInfoDecoder =
         Urls = get.Required.Field "urls" decodeUrls
     })
 
-let internal getPhotoInfo
+let getPhotoInfo
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (photoId: string) (photoSecret: string option) =
         let args =
@@ -415,7 +415,7 @@ let private getSizesDecoder =
     Decode.object (fun get ->
         get.Required.Field "size" (Decode.list sizeDecoder))
 
-let internal getSizes
+let getSizes
     (config: FlickrConfig) (accessToken: AccessTokenInfo)
     (photoId: string) =
         let args =

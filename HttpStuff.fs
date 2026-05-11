@@ -1,4 +1,4 @@
-module FsFlickr.HttpStuff
+module internal FsFlickr.HttpStuff
 
 #if PLATFORM_FABLE
 open Thoth.Json
@@ -6,14 +6,14 @@ open Thoth.Json
 open Thoth.Json.Net
 #endif
 
-type internal ApiResult<'a> =
+type ApiResult<'a> =
     | ApiOk of 'a
     | ApiError of EndpointError
 
-let internal isSuccess (code: int) =
+let isSuccess (code: int) =
     code >= 200 && code < 300
 
-let internal decodeResponse (decoder: Decoder<'a>) (statusCode: int, responseText: string): ApiResult<'a> =
+let decodeResponse (decoder: Decoder<'a>) (statusCode: int, responseText: string): ApiResult<'a> =
     if isSuccess statusCode then
         match Decode.fromString decoder responseText with
         | Ok regResult ->

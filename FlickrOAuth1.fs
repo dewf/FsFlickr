@@ -1,4 +1,4 @@
-﻿module FsFlickr.FlickrOAuth1
+﻿module internal FsFlickr.FlickrOAuth1
 
 #if PLATFORM_FABLE
 open Thoth.Json
@@ -12,12 +12,12 @@ let private REQUEST_URL = "https://www.flickr.com/services/oauth/request_token"
 let private AUTH_URL = "https://www.flickr.com/services/oauth/authorize"
 let private ACCESS_TOKEN_URL = "https://www.flickr.com/services/oauth/access_token"
 
-type internal TokenAndSecret = {
+type TokenAndSecret = {
     Token: string
     Secret: string
 }
 
-type internal AccessTokenInfo = {
+type AccessTokenInfo = {
     Fullname: string
     OAuthToken: string
     OAuthTokenSecret: string
@@ -25,7 +25,7 @@ type internal AccessTokenInfo = {
     Username: string
 }
 
-let internal encodeAccessToken (ati: AccessTokenInfo) =
+let encodeAccessToken (ati: AccessTokenInfo) =
     Encode.object [
         "fullname", Encode.string ati.Fullname
         "token", Encode.string ati.OAuthToken
@@ -34,7 +34,7 @@ let internal encodeAccessToken (ati: AccessTokenInfo) =
         "username", Encode.string ati.Username
     ] |> Encode.toString 4
 
-let internal decodeAccessToken (input: string) =
+let decodeAccessToken (input: string) =
     let decoder =
         Decode.object (fun get ->
             { Fullname = get.Required.Field "fullname" Decode.string
@@ -44,7 +44,7 @@ let internal decodeAccessToken (input: string) =
               Username = get.Required.Field "username" Decode.string })
     Decode.fromString decoder input
 
-type internal OAuthPhase =
+type OAuthPhase =
     | BeforeRequest of callback: OAuthCallback
     | BeforeAuth of ts: TokenAndSecret
     | BeforeAccess of ts: TokenAndSecret * verifier: string
@@ -132,7 +132,7 @@ let private fetchFinalAccessToken (config: FlickrConfig) (url: string) (authHead
               Username = pairs["username"] })
     }
 
-let internal generateAuthHeader (config: FlickrConfig) (phase: OAuthPhase) (dataFields: (string * string) list) (verb: string) (url: string) =
+let generateAuthHeader (config: FlickrConfig) (phase: OAuthPhase) (dataFields: (string * string) list) (verb: string) (url: string) =
     let authFields =
         generateAuthFields config.ApiKey phase
     let signatureFields =
@@ -154,13 +154,13 @@ let internal generateAuthHeader (config: FlickrConfig) (phase: OAuthPhase) (data
         return "OAuth " + joined
     }
 
-let internal beginOAuthProcess (config: FlickrConfig) (callback: OAuthCallback) =
+let beginOAuthProcess (config: FlickrConfig) (callback: OAuthCallback) =
     async {
         let! authHeader = generateAuthHeader config (BeforeRequest callback) [] "GET" REQUEST_URL
         return! fetchTokenAndSecret config REQUEST_URL authHeader
     }
 
-let internal generateAuthLink (ts: TokenAndSecret) =
+let generateAuthLink (ts: TokenAndSecret) =
     let queryString =
         [ "oauth_token", ts.Token
           "perms", "read" ]
@@ -168,7 +168,7 @@ let internal generateAuthLink (ts: TokenAndSecret) =
         |> Util.mapToQueryString
     sprintf "%s?%s" AUTH_URL queryString
 
-let internal finalizeOAuth (config: FlickrConfig) (tokenAndSecret: TokenAndSecret) (verifier: string) =
+let finalizeOAuth (config: FlickrConfig) (tokenAndSecret: TokenAndSecret) (verifier: string) =
     async {
         let! authHeader = generateAuthHeader config (BeforeAccess (tokenAndSecret, verifier)) [] "GET" ACCESS_TOKEN_URL
         return! fetchFinalAccessToken config ACCESS_TOKEN_URL authHeader

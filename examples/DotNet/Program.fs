@@ -2,8 +2,8 @@
 open System.IO
 open FsFlickr
 
-let API_KEY = failwith "please provide API_KEY here"
-let API_SECRET = failwith "please provide API_SECRET here"
+let API_KEY = failwith "please provide API_KEY string here"
+let API_SECRET = failwith "please provide API_SECRET string here"
 
 let ACCESS_TOKEN_FILENAME = "flickr-oauth-token.json"
 

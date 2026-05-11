@@ -1,4 +1,4 @@
-﻿module FsFlickr.Config
+﻿module internal FsFlickr.Config
 
 type FlickrConfig = {
     ApiKey: string
