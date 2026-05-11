@@ -11,6 +11,8 @@ type private AuthState =
     | Finalized of ati: AccessTokenInfo
     | ErrState of reason: string
 
+// the flickr API wrapper class. this encapsulates the Oauth 1.0a flow, necessary to fully use the API
+// unfortunately I don't think primary constructors can be documented with XML syntax :(
 type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
     let mutable authState: AuthState = Init
     let config =
@@ -27,6 +29,7 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
                 return FlickrNotYetAuthenticated
             }
 
+    /// Attempt to load existing access token from JSON (so you don't have to re-authenticate)
     member this.LoadAccessToken (json: string) =
         match decodeAccessToken json with
         | Ok ati ->
@@ -35,6 +38,7 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
         | Error err ->
             Error $"FlickrAPI.LoadAccessToken: decode error ({err})"
 
+    /// Obtain the current access token (if any), so that you can persist it elsewhere
     member this.AccessTokenJson =
         match authState with
         | Finalized ati ->
@@ -43,6 +47,8 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
         | _ ->
             None
 
+    /// First step of OAuth: generate a URL for the user to click. Requires choosing an OAuth callback type:
+    ///   out-of-band or a callback URL
     member this.GenerateOAuthUrl (callback: OAuthCallback) =
         async {
             let! result = beginOAuthProcess config callback
@@ -57,6 +63,8 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
                 return Error err
         }
 
+    /// Use the generated verifier code - either automatically obtained via a callback URL,
+    ///   or provided by the user manually for desktop apps
     member this.Verify (verifier: string) =
         async {
             match authState with
@@ -78,6 +86,7 @@ type FlickrAPI(apiKey: string, apiSecret: string, ?corsProxy: string) =
                 return (Error $"FlickrAPI.Verify(): was already in ErrState [{err}]")
         }
 
+    // actual API method wrappers below =============================================
     member this.UrlsLookupGroup (url: string) =
         withAccessToken (fun ati -> urlsLookupGroup config ati url)
 
