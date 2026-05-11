@@ -1,4 +1,4 @@
-﻿module FsFlickr.Platform
+﻿module internal FsFlickr.Platform
 
 open Fable.Core
 open Fable.SimpleHttp
